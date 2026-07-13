@@ -10,13 +10,11 @@ describe('StartGameUseCase', () => {
 
     await testAPI.whenStartingGame({ levelId: level.id });
 
-    testAPI.thenLevelWasQueriedWith(level.id);
     testAPI.thenSessionIsPlaying();
   });
 
   it('should_fail_when_level_does_not_exist', async () => {
     const testAPI = new StartGameTestAPI();
-    testAPI.givenNoLevelExists();
 
     await testAPI.whenStartingGame({ levelId: LevelId.of('ghost') });
 

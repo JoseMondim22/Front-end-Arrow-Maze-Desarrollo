@@ -5,23 +5,27 @@ describe('LoginUseCase', () => {
   it('should_return_and_save_session_when_credentials_are_valid', async () => {
     const testAPI = new LoginTestAPI();
     const query = AuthMother.loginQuery();
-    const session = AuthMother.session();
-    testAPI.givenCredentialsYield(session);
+    testAPI.givenRegisteredUser({
+      email: query.email,
+      password: query.password,
+      username: 'player_one',
+      userId: 'user-1',
+    });
 
     await testAPI.whenLoggingIn(query);
 
-    testAPI.thenSessionWasReturned(session);
-    testAPI.thenSessionWasSaved(session);
+    testAPI.thenSessionUserIdIs('user-1');
+    await testAPI.thenSessionWasSaved();
   });
 
-  it('should_propagate_error_and_not_save_session_when_credentials_are_invalid', async () => {
+  it('should_fail_and_not_save_session_when_credentials_are_invalid', async () => {
     const testAPI = new LoginTestAPI();
     const query = AuthMother.loginQuery();
-    testAPI.givenLoginFailsWith(new Error('invalid credentials'));
+    // No user registered for this email: login must fail.
 
     await testAPI.whenLoggingIn(query);
 
-    testAPI.thenErrorWasThrown('invalid credentials');
-    testAPI.thenSessionWasNotSaved();
+    testAPI.thenErrorWasThrown('Invalid credentials');
+    await testAPI.thenSessionWasNotSaved();
   });
 });

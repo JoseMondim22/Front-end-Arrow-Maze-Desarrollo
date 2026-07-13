@@ -1,19 +1,14 @@
-import { ILevelRepository } from '@domain/level/ILevelRepository';
-import { Level } from '@domain/level/Level';
 import { GetLevelsUseCase } from '@application/use-cases/levels/GetLevelsUseCase';
-import { mock, MockProxy } from 'jest-mock-extended';
+import { Level } from '@domain/level/Level';
+import { InMemoryLevelRepository } from '../in-memory/InMemoryLevelRepository';
 
-/** Testing API for GetLevelsUseCase. */
+/** Testing API for GetLevelsUseCase. ILevelRepository is an in-memory fake. */
 export class GetLevelsTestAPI {
-  private readonly levelRepository: MockProxy<ILevelRepository> = mock<ILevelRepository>();
+  private readonly levelRepository = new InMemoryLevelRepository();
   private result: Level[] = [];
 
-  givenLevelsExist(levels: Level[]): void {
-    this.levelRepository.findAll.mockResolvedValue(levels);
-  }
-
-  givenNoLevelsExist(): void {
-    this.levelRepository.findAll.mockResolvedValue([]);
+  givenLevelsExist(...levels: Level[]): void {
+    this.levelRepository.seed(...levels);
   }
 
   async whenListingLevels(): Promise<void> {

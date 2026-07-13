@@ -1,27 +1,21 @@
-import { GameSession } from '@domain/game-session/GameSession';
-import { ILevelRepository } from '@domain/level/ILevelRepository';
-import { Level } from '@domain/level/Level';
-import { FailedMovesScoringStrategy } from '@domain/shared/services/FailedMovesScoringStrategy';
-import { LevelId } from '@domain/shared/value-objects/LevelId';
 import { StartGameQuery } from '@application/use-cases/levels/StartGameQuery';
 import { StartGameUseCase } from '@application/use-cases/levels/StartGameUseCase';
-import { mock, MockProxy } from 'jest-mock-extended';
+import { GameSession } from '@domain/game-session/GameSession';
+import { Level } from '@domain/level/Level';
+import { FailedMovesScoringStrategy } from '@domain/shared/services/FailedMovesScoringStrategy';
+import { InMemoryLevelRepository } from '../in-memory/InMemoryLevelRepository';
 
 /**
- * Testing API for StartGameUseCase. The scoring policy is a pure domain service,
- * not an infrastructure port, so a real strategy is used instead of a mock.
+ * Testing API for StartGameUseCase. ILevelRepository is an in-memory fake; the
+ * scoring policy is a real ScoringStrategy (a pure domain service, not a port).
  */
 export class StartGameTestAPI {
-  private readonly levelRepository: MockProxy<ILevelRepository> = mock<ILevelRepository>();
+  private readonly levelRepository = new InMemoryLevelRepository();
   private session: GameSession | undefined;
   private thrownError: unknown;
 
   givenLevelExists(level: Level): void {
-    this.levelRepository.findById.mockResolvedValue(level);
-  }
-
-  givenNoLevelExists(): void {
-    this.levelRepository.findById.mockResolvedValue(null);
+    this.levelRepository.seed(level);
   }
 
   async whenStartingGame(query: StartGameQuery): Promise<void> {
@@ -34,10 +28,6 @@ export class StartGameTestAPI {
     } catch (error) {
       this.thrownError = error;
     }
-  }
-
-  thenLevelWasQueriedWith(levelId: LevelId): void {
-    expect(this.levelRepository.findById).toHaveBeenCalledWith(levelId);
   }
 
   thenSessionIsPlaying(): void {

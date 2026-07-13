@@ -2,24 +2,23 @@ import { AuthMother } from '@app-mothers/AuthMother';
 import { RegisterUserTestAPI } from '@testing-apis/auth/RegisterUserTestAPI';
 
 describe('RegisterUserUseCase', () => {
-  it('should_register_user_when_valid_command_is_given', async () => {
+  it('should_register_user_when_email_is_not_taken', async () => {
     const testAPI = new RegisterUserTestAPI();
     const command = AuthMother.registerCommand();
-    testAPI.givenRegistrationSucceeds();
 
     await testAPI.whenRegistering(command);
 
-    testAPI.thenUserWasRegisteredWith(command);
+    testAPI.thenUserWasRegistered(command.email);
     testAPI.thenNoErrorWasThrown();
   });
 
-  it('should_propagate_error_when_registration_fails', async () => {
+  it('should_fail_when_email_is_already_registered', async () => {
     const testAPI = new RegisterUserTestAPI();
     const command = AuthMother.registerCommand();
-    testAPI.givenRegistrationFailsWith(new Error('email already registered'));
+    testAPI.givenEmailAlreadyRegistered(command.email);
 
     await testAPI.whenRegistering(command);
 
-    testAPI.thenErrorWasThrown('email already registered');
+    testAPI.thenErrorWasThrown(`Email already registered: ${command.email}`);
   });
 });

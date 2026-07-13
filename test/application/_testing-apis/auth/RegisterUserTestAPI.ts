@@ -1,22 +1,20 @@
-import { IAuthRepository } from '@application/ports/IAuthRepository';
 import { RegisterUserCommand } from '@application/use-cases/auth/RegisterUserCommand';
 import { RegisterUserUseCase } from '@application/use-cases/auth/RegisterUserUseCase';
-import { mock, MockProxy } from 'jest-mock-extended';
+import { InMemoryAuthRepository } from '../in-memory/InMemoryAuthRepository';
 
-/**
- * Testing API for RegisterUserUseCase. The only place that instantiates the use
- * case and its mocked port; the spec never touches jest-mock-extended directly.
- */
+/** Testing API for RegisterUserUseCase. Uses an in-memory fake for IAuthRepository
+ * (a persistence-like port), not a jest mock, so real registration rules apply. */
 export class RegisterUserTestAPI {
-  private readonly authRepository: MockProxy<IAuthRepository> = mock<IAuthRepository>();
+  private readonly authRepository = new InMemoryAuthRepository();
   private thrownError: unknown;
 
-  givenRegistrationSucceeds(): void {
-    this.authRepository.register.mockResolvedValue(undefined);
-  }
-
-  givenRegistrationFailsWith(error: Error): void {
-    this.authRepository.register.mockRejectedValue(error);
+  givenEmailAlreadyRegistered(email: string): void {
+    this.authRepository.seed({
+      email,
+      password: 'irrelevant',
+      username: 'irrelevant',
+      userId: 'existing-user',
+    });
   }
 
   async whenRegistering(command: RegisterUserCommand): Promise<void> {
@@ -28,8 +26,8 @@ export class RegisterUserTestAPI {
     }
   }
 
-  thenUserWasRegisteredWith(command: RegisterUserCommand): void {
-    expect(this.authRepository.register).toHaveBeenCalledWith(command);
+  thenUserWasRegistered(email: string): void {
+    expect(this.authRepository.isRegistered(email)).toBe(true);
   }
 
   thenNoErrorWasThrown(): void {

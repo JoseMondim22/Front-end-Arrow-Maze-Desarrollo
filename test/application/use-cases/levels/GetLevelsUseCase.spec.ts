@@ -5,7 +5,7 @@ describe('GetLevelsUseCase', () => {
   it('should_return_every_level_when_levels_exist', async () => {
     const testAPI = new GetLevelsTestAPI();
     const levels = [LevelMother.aLevel(), LevelMother.atOrder(2)];
-    testAPI.givenLevelsExist(levels);
+    testAPI.givenLevelsExist(...levels);
 
     await testAPI.whenListingLevels();
 
@@ -14,7 +14,6 @@ describe('GetLevelsUseCase', () => {
 
   it('should_return_empty_list_when_no_levels_exist', async () => {
     const testAPI = new GetLevelsTestAPI();
-    testAPI.givenNoLevelsExist();
 
     await testAPI.whenListingLevels();
 

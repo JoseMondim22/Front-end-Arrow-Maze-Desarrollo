@@ -1,46 +1,45 @@
-import { IAuthRepository, LoginResult } from '@application/ports/IAuthRepository';
-import { ITokenStore } from '@application/ports/ITokenStore';
 import { LoginQuery } from '@application/use-cases/auth/LoginQuery';
 import { LoginUseCase } from '@application/use-cases/auth/LoginUseCase';
-import { mock, MockProxy } from 'jest-mock-extended';
+import { InMemoryAuthRepository } from '../in-memory/InMemoryAuthRepository';
+import { InMemoryTokenStore } from '../in-memory/InMemoryTokenStore';
 
-/**
- * Testing API for LoginUseCase. The only place that instantiates the use case and
- * its two mocked ports (IAuthRepository, ITokenStore).
- */
+/** Testing API for LoginUseCase. Both ports are persistence-like, so both are
+ * in-memory fakes, not jest mocks. */
 export class LoginTestAPI {
-  private readonly authRepository: MockProxy<IAuthRepository> = mock<IAuthRepository>();
-  private readonly tokenStore: MockProxy<ITokenStore> = mock<ITokenStore>();
-  private result: LoginResult | undefined;
+  private readonly authRepository = new InMemoryAuthRepository();
+  private readonly tokenStore = new InMemoryTokenStore();
+  private sessionUserId: string | undefined;
   private thrownError: unknown;
 
-  givenCredentialsYield(session: LoginResult): void {
-    this.authRepository.login.mockResolvedValue(session);
-  }
-
-  givenLoginFailsWith(error: Error): void {
-    this.authRepository.login.mockRejectedValue(error);
+  givenRegisteredUser(user: {
+    email: string;
+    password: string;
+    username: string;
+    userId: string;
+  }): void {
+    this.authRepository.seed(user);
   }
 
   async whenLoggingIn(query: LoginQuery): Promise<void> {
     const useCase = new LoginUseCase(this.authRepository, this.tokenStore);
     try {
-      this.result = await useCase.execute(query);
+      const result = await useCase.execute(query);
+      this.sessionUserId = result.userId;
     } catch (error) {
       this.thrownError = error;
     }
   }
 
-  thenSessionWasReturned(expected: LoginResult): void {
-    expect(this.result).toEqual(expected);
+  thenSessionUserIdIs(expectedUserId: string): void {
+    expect(this.sessionUserId).toBe(expectedUserId);
   }
 
-  thenSessionWasSaved(expected: LoginResult): void {
-    expect(this.tokenStore.saveSession).toHaveBeenCalledWith(expected);
+  async thenSessionWasSaved(): Promise<void> {
+    expect(await this.tokenStore.hasActiveSession()).toBe(true);
   }
 
-  thenSessionWasNotSaved(): void {
-    expect(this.tokenStore.saveSession).not.toHaveBeenCalled();
+  async thenSessionWasNotSaved(): Promise<void> {
+    expect(await this.tokenStore.hasActiveSession()).toBe(false);
   }
 
   thenErrorWasThrown(message: string): void {
