@@ -1,7 +1,10 @@
+import { GameSession } from '../game-session/GameSession';
+import { ScoringStrategy } from '../shared/services/ScoringStrategy';
 import { LevelId } from '../shared/value-objects/LevelId';
 import { LevelOrder } from '../shared/value-objects/LevelOrder';
 import { LevelRules } from '../shared/value-objects/LevelRules';
 import { Score } from '../shared/value-objects/Score';
+import { BoardBuilder } from './BoardBuilder';
 import { BoardDefinition } from './value-objects/BoardDefinition';
 
 /**
@@ -14,10 +17,8 @@ import { BoardDefinition } from './value-objects/BoardDefinition';
  * It carries real behaviour, not just getters: isScorePlausible guards against a
  * score above the level's ceiling before it is ever recorded or synced.
  *
- * Factory Method (pending): startSession(scoring: ScoringStrategy): GameSession will
- * spawn an in-memory GameSession from this definition. It is intentionally left out
- * until the GameSession aggregate and ScoringStrategy exist, so this file stays free
- * of forward references that would not type-check yet.
+ * Factory Method: startSession spawns an in-memory GameSession from this definition,
+ * building the runtime Board with BoardBuilder and injecting the scoring policy.
  */
 export class Level {
   private constructor(
@@ -50,6 +51,12 @@ export class Level {
   /** A score is plausible only if it does not exceed the level's ceiling. */
   isScorePlausible(score: Score): boolean {
     return !score.isGreaterThan(Score.of(this.levelRules.maxPossibleScore));
+  }
+
+  /** Factory Method: spawn a live GameSession from this static definition. */
+  startSession(scoring: ScoringStrategy): GameSession {
+    const board = new BoardBuilder(this.boardDefinition).build();
+    return GameSession.begin({ board, rules: this.levelRules, scoring });
   }
 
   get id(): LevelId {
