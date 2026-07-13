@@ -1,0 +1,62 @@
+{
+  "app": {
+    "name": "Arrow Maze"
+  },
+  "common": {
+    "play": "Jugar",
+    "settings": "Ajustes",
+    "retry": "Reintentar",
+    "loading": "Cargando..."
+  },
+  "auth": {
+    "login": {
+      "welcome": "¡Bienvenido de nuevo!",
+      "emailPlaceholder": "Email",
+      "passwordPlaceholder": "Contraseña",
+      "submit": "Ingresar",
+      "noAccount": "¿No tienes cuenta? Regístrate"
+    },
+    "register": {
+      "title": "¡Únete al laberinto!",
+      "subtitle": "Crea tu cuenta",
+      "usernamePlaceholder": "Usuario",
+      "emailPlaceholder": "Email",
+      "passwordPlaceholder": "Contraseña",
+      "submit": "Registrarme",
+      "hasAccount": "¿Ya tienes cuenta? Inicia sesión"
+    }
+  },
+  "levelSelect": {
+    "level": "Nivel {{order}}",
+    "locked": "Bloqueado",
+    "bestScore": "Mejor puntaje: {{score}}",
+    "tapToPlay": "Toca para jugar"
+  },
+  "hud": {
+    "moves": "Movimientos",
+    "timeLeft": "Tiempo restante",
+    "chainsLeft": "Flechas restantes"
+  },
+  "victory": {
+    "title": "¡Victoria!",
+    "points": "{{score}} puntos",
+    "next": "Siguiente nivel"
+  },
+  "leaderboard": {
+    "title": "Ranking",
+    "loading": "Cargando ranking...",
+    "empty": "Todavía no hay puntajes — ¡sé el primero!",
+    "row": "{{position}}. {{username}} — {{score}} pts"
+  },
+  "defeat": {
+    "title": "Derrota",
+    "subtitle": "Ya no quedan movimientos posibles",
+    "backToLevels": "Volver a los niveles"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "muteSound": "Silenciar sonido",
+    "language": "Idioma",
+    "logout": "Cerrar sesión"
+  }
+}

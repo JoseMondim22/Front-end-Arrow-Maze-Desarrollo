@@ -1,5 +1,5 @@
 /**
- * Technical port over sound effects and music (expo-av, Singleton implementation).
+ * Technical port over sound effects and music (expo-audio, Singleton implementation).
  * Not tied to any use case: the store/UI calls it directly on domain events.
  */
 export interface IAudioService {

@@ -9,6 +9,7 @@ import { ChainId } from '../shared/value-objects/ChainId';
 import { LevelRules } from '../shared/value-objects/LevelRules';
 import { Score } from '../shared/value-objects/Score';
 import { Board } from './Board';
+import { BoardView } from './BoardView';
 import { GameStatus } from './value-objects/GameStatus';
 
 /** The full immutable state of a session. Passed as one object so the many fields
@@ -81,6 +82,12 @@ export class GameSession {
 
   get activeChainCount(): number {
     return this.state.board.chains.length;
+  }
+
+  /** Read-only render projection for the UI (§6.5). Recomputed on demand — cheap,
+   * and keeps GameSession from caching a view that could drift from its state. */
+  get view(): BoardView {
+    return this.state.board.toView();
   }
 
   /** The final score, available only once the level is won; null otherwise. */

@@ -1,0 +1,62 @@
+{
+  "app": {
+    "name": "Arrow Maze"
+  },
+  "common": {
+    "play": "Play",
+    "settings": "Settings",
+    "retry": "Retry",
+    "loading": "Loading..."
+  },
+  "auth": {
+    "login": {
+      "welcome": "Welcome back!",
+      "emailPlaceholder": "Email",
+      "passwordPlaceholder": "Password",
+      "submit": "Login",
+      "noAccount": "No account? Register"
+    },
+    "register": {
+      "title": "Join the maze!",
+      "subtitle": "Create your account",
+      "usernamePlaceholder": "Username",
+      "emailPlaceholder": "Email",
+      "passwordPlaceholder": "Password",
+      "submit": "Register",
+      "hasAccount": "Already have an account? Login"
+    }
+  },
+  "levelSelect": {
+    "level": "Level {{order}}",
+    "locked": "Locked",
+    "bestScore": "Best score: {{score}}",
+    "tapToPlay": "Tap to play"
+  },
+  "hud": {
+    "moves": "Moves",
+    "timeLeft": "Time left",
+    "chainsLeft": "Chains left"
+  },
+  "victory": {
+    "title": "Victory!",
+    "points": "{{score}} points",
+    "next": "Next level"
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "loading": "Loading leaderboard...",
+    "empty": "No scores yet — be the first!",
+    "row": "{{position}}. {{username}} — {{score}} pts"
+  },
+  "defeat": {
+    "title": "Defeat",
+    "subtitle": "No more legal moves left",
+    "backToLevels": "Back to levels"
+  },
+  "settings": {
+    "title": "Settings",
+    "muteSound": "Mute sound",
+    "language": "Language",
+    "logout": "Log out"
+  }
+}

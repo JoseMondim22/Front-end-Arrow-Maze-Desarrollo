@@ -1,9 +1,12 @@
 import { create, StoreApi, UseBoundStore } from 'zustand';
+import { ICommandService } from '../../application/cqs/ICommandService';
+import { IQueryService } from '../../application/cqs/IQueryService';
 import { GameCommandInvoker } from '../../application/game/GameCommandInvoker';
 import { MoveArrowCommand } from '../../application/game/MoveArrowCommand';
 import { RotateArrowCommand } from '../../application/game/RotateArrowCommand';
-import { CompleteLevelUseCase } from '../../application/use-cases/progress/CompleteLevelUseCase';
-import { StartGameUseCase } from '../../application/use-cases/levels/StartGameUseCase';
+import { CompleteLevelCommand } from '../../application/use-cases/progress/CompleteLevelCommand';
+import { StartGameQuery } from '../../application/use-cases/levels/StartGameQuery';
+import { IAudioService } from '../../application/ports/IAudioService';
 import { GameSession } from '../../domain/game-session/GameSession';
 import { Level } from '../../domain/level/Level';
 import { ChainId } from '../../domain/shared/value-objects/ChainId';
@@ -17,13 +20,25 @@ export interface GameStoreState {
   startGame(level: Level): Promise<void>;
   moveArrow(chainId: ChainId): void;
   rotateArrow(chainId: ChainId): void;
-  undo(): void;
+  tick(elapsedSeconds: number): void;
 }
 
 export interface GameStoreDependencies {
-  startGameUseCase: StartGameUseCase;
-  completeLevelUseCase: CompleteLevelUseCase;
+  startGameUseCase: IQueryService<StartGameQuery, GameSession>;
+  completeLevelUseCase: ICommandService<CompleteLevelCommand>;
+  audioService: IAudioService;
 }
+
+/** Effect ids the audio asset map (container.ts) must provide. playEffect() is a
+ * safe no-op for any id with no matching source, so wiring these calls never
+ * breaks anything while the real files don't exist yet. */
+const SFX = {
+  chainExit: 'chain-exit',
+  blocked: 'blocked',
+  rotate: 'rotate',
+  victory: 'victory',
+  defeat: 'defeat',
+} as const;
 
 /**
  * Presenter for the game screen. Holds the current GameSession (the live
@@ -33,6 +48,11 @@ export interface GameStoreDependencies {
  * the aggregate directly, no port involved. startGame takes the full Level, not
  * just its id — StartGameUseCase only returns a GameSession, never the level's
  * order, and CompleteLevelCommand needs that order later when the level is won.
+ *
+ * Audio is triggered here, not from GameScreen: per GameEvent's own doc comment,
+ * "the store drains [events] via pullEvents() and republishes to UI and audio" —
+ * this is the one place that sees both the domain events and the raw state deltas
+ * (failedMoves, status) needed to know which sound fits a transition.
  */
 export function createGameStore(
   deps: GameStoreDependencies,
@@ -60,13 +80,24 @@ export function createGameStore(
       });
   };
 
+  const playTerminalEffect = (previousStatus: string, session: GameSession): void => {
+    if (session.status.name === previousStatus) {
+      return;
+    }
+    if (session.status.name === 'Victory') {
+      void deps.audioService.playEffect(SFX.victory);
+    } else if (session.status.name === 'Defeat') {
+      void deps.audioService.playEffect(SFX.defeat);
+    }
+  };
+
   return create<GameStoreState>((set) => ({
     session: null,
     isLoading: false,
     error: null,
 
     async startGame(level) {
-      set({ isLoading: true, error: null });
+      set({ session: null, isLoading: true, error: null });
       try {
         const session = await deps.startGameUseCase.execute({ levelId: level.id });
         invoker = new GameCommandInvoker(session);
@@ -82,8 +113,18 @@ export function createGameStore(
       if (invoker === null) {
         return;
       }
+      const previous = invoker.session;
       const session = invoker.execute(new MoveArrowCommand(chainId));
       set({ session });
+
+      if (session !== previous) {
+        if (session.pullEvents().some((event) => event.name === 'ArrowChainExited')) {
+          void deps.audioService.playEffect(SFX.chainExit);
+        } else if (session.failedMoves > previous.failedMoves) {
+          void deps.audioService.playEffect(SFX.blocked);
+        }
+        playTerminalEffect(previous.status.name, session);
+      }
       completeIfWon(session);
     },
 
@@ -91,14 +132,22 @@ export function createGameStore(
       if (invoker === null) {
         return;
       }
-      set({ session: invoker.execute(new RotateArrowCommand(chainId)) });
+      const previous = invoker.session;
+      const session = invoker.execute(new RotateArrowCommand(chainId));
+      set({ session });
+      if (session !== previous) {
+        void deps.audioService.playEffect(SFX.rotate);
+      }
     },
 
-    undo() {
+    tick(elapsedSeconds) {
       if (invoker === null) {
         return;
       }
-      set({ session: invoker.undo() });
+      const previous = invoker.session;
+      const session = invoker.tick(elapsedSeconds);
+      set({ session });
+      playTerminalEffect(previous.status.name, session);
     },
   }));
 }

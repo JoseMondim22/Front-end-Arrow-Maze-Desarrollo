@@ -1,9 +1,11 @@
 import { create, StoreApi, UseBoundStore } from 'zustand';
+import { ICommandService } from '../../application/cqs/ICommandService';
+import { IQueryService } from '../../application/cqs/IQueryService';
 import { AuthSession, ITokenStore } from '../../application/ports/ITokenStore';
+import { LoginResult } from '../../application/ports/IAuthRepository';
 import { LoginQuery } from '../../application/use-cases/auth/LoginQuery';
-import { LoginUseCase } from '../../application/use-cases/auth/LoginUseCase';
 import { RegisterUserCommand } from '../../application/use-cases/auth/RegisterUserCommand';
-import { RegisterUserUseCase } from '../../application/use-cases/auth/RegisterUserUseCase';
+import { ClearLocalProgressCommand } from '../../application/use-cases/progress/ClearLocalProgressCommand';
 
 export interface AuthStoreState {
   session: AuthSession | null;
@@ -16,8 +18,9 @@ export interface AuthStoreState {
 }
 
 export interface AuthStoreDependencies {
-  registerUserUseCase: RegisterUserUseCase;
-  loginUseCase: LoginUseCase;
+  registerUserUseCase: ICommandService<RegisterUserCommand>;
+  loginUseCase: IQueryService<LoginQuery, LoginResult>;
+  clearLocalProgressUseCase: ICommandService<ClearLocalProgressCommand>;
   tokenStore: ITokenStore;
 }
 
@@ -56,18 +59,29 @@ export function createAuthStore(
 
     async logout() {
       await deps.tokenStore.clearSession();
+      // Local progress has no per-account scoping (§15) — wipe it here so the
+      // next account to log in on this device never sees a leftover user's
+      // progress (see ClearLocalProgressUseCase).
+      await deps.clearLocalProgressUseCase.execute({});
       set({ session: null });
     },
 
     async restoreSession() {
-      const hasSession = await deps.tokenStore.hasActiveSession();
-      if (!hasSession) {
-        return;
-      }
-      const accessToken = await deps.tokenStore.getAccessToken();
-      const userId = await deps.tokenStore.getUserId();
-      if (accessToken !== null && userId !== null) {
-        set({ session: { accessToken, userId } });
+      // Checking for a persisted session must never block app boot: if the
+      // platform's secure store is unavailable for any reason, fall back to
+      // "not logged in" instead of crashing the startup gate.
+      try {
+        const hasSession = await deps.tokenStore.hasActiveSession();
+        if (!hasSession) {
+          return;
+        }
+        const accessToken = await deps.tokenStore.getAccessToken();
+        const userId = await deps.tokenStore.getUserId();
+        if (accessToken !== null && userId !== null) {
+          set({ session: { accessToken, userId } });
+        }
+      } catch {
+        // Treated as "no session" — see comment above.
       }
     },
   }));

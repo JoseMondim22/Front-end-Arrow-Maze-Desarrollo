@@ -13,7 +13,6 @@ describe('GameCommandInvoker', () => {
 
     expect(invoker.session.status.name).toBe('Victory');
     expect(invoker.session.movesUsed).toBe(1);
-    expect(invoker.canUndo()).toBe(true);
   });
 
   it('should_not_change_session_when_it_cannot_act', () => {
@@ -24,19 +23,6 @@ describe('GameCommandInvoker', () => {
 
     expect(invoker.session).toBe(paused);
     expect(invoker.session.movesUsed).toBe(0);
-    expect(invoker.canUndo()).toBe(false);
-  });
-
-  it('should_undo_the_last_move_when_undo_is_called', () => {
-    const session = GameSessionMother.withHeadFacingWall();
-    const invoker = new GameCommandInvoker(session);
-    invoker.execute(new MoveArrowCommand(ChainId.of('c1')));
-
-    invoker.undo();
-
-    expect(invoker.session).toBe(session);
-    expect(invoker.session.movesUsed).toBe(0);
-    expect(invoker.canUndo()).toBe(false);
   });
 
   it('should_rotate_without_counting_a_move', () => {
@@ -46,16 +32,14 @@ describe('GameCommandInvoker', () => {
     invoker.execute(new RotateArrowCommand(ChainId.of('c1')));
 
     expect(invoker.session.movesUsed).toBe(0);
-    expect(invoker.canUndo()).toBe(true);
   });
 
-  it('should_do_nothing_when_undo_is_called_with_empty_history', () => {
+  it('should_advance_time_when_ticking', () => {
     const session = GameSessionMother.playingWithClearPathToExit();
     const invoker = new GameCommandInvoker(session);
 
-    invoker.undo();
+    invoker.tick(10);
 
-    expect(invoker.session).toBe(session);
-    expect(invoker.canUndo()).toBe(false);
+    expect(invoker.session.timeUsed).toBe(10);
   });
 });

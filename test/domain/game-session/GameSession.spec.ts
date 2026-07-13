@@ -111,4 +111,15 @@ describe('GameSession', () => {
 
     expect(won.pause().status.name).toBe('Victory');
   });
+
+  it('should_reflect_the_current_board_in_its_render_view', () => {
+    const session = GameSessionMother.playingWithClearPathToExit();
+
+    expect(session.view.chains).toHaveLength(1);
+
+    const after = session.moveArrow(ChainId.of('c1'));
+
+    // The chain exited: the view drops it, mirroring the board it delegates to.
+    expect(after.view.chains).toHaveLength(0);
+  });
 });
