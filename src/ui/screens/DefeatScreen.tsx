@@ -25,7 +25,9 @@ export function DefeatScreen({ route, navigation }: Props): React.JSX.Element {
         <Text style={styles.buttonText}>{t('common.retry')}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation.navigate('LevelSelect')}>
+      {/* navigate() pushes a new LevelSelect instead of popping back to the
+          existing one in RN v7 — popTo() discards everything above it. */}
+      <TouchableOpacity onPress={() => navigation.popTo('LevelSelect')}>
         <Text style={styles.link}>{t('defeat.backToLevels')}</Text>
       </TouchableOpacity>
     </View>

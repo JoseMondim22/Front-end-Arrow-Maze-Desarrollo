@@ -6,6 +6,7 @@ import { LoginResult } from '../../application/ports/IAuthRepository';
 import { LoginQuery } from '../../application/use-cases/auth/LoginQuery';
 import { RegisterUserCommand } from '../../application/use-cases/auth/RegisterUserCommand';
 import { ClearLocalProgressCommand } from '../../application/use-cases/progress/ClearLocalProgressCommand';
+import { RestorePlayerProgressCommand } from '../../application/use-cases/progress/RestorePlayerProgressCommand';
 
 export interface AuthStoreState {
   session: AuthSession | null;
@@ -21,6 +22,7 @@ export interface AuthStoreDependencies {
   registerUserUseCase: ICommandService<RegisterUserCommand>;
   loginUseCase: IQueryService<LoginQuery, LoginResult>;
   clearLocalProgressUseCase: ICommandService<ClearLocalProgressCommand>;
+  restorePlayerProgressUseCase: ICommandService<RestorePlayerProgressCommand>;
   tokenStore: ITokenStore;
 }
 
@@ -51,6 +53,11 @@ export function createAuthStore(
       set({ isAuthenticating: true, error: null });
       try {
         const session = await deps.loginUseCase.execute(query);
+        // Local progress has no per-account scoping and gets wiped on
+        // logout (see ClearLocalProgressUseCase) — without this, the same
+        // account logging back in on this device would look brand-new.
+        // Best-effort: a failed restore (e.g. offline) must not block login.
+        await deps.restorePlayerProgressUseCase.execute({}).catch(() => {});
         set({ session, isAuthenticating: false });
       } catch (error) {
         set({ isAuthenticating: false, error: (error as Error).message });

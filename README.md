@@ -493,6 +493,7 @@ classDiagram
     class SyncProgressUseCase { +execute(SyncProgressCommand) void }
     class LoadPlayerProgressUseCase { +execute(LoadPlayerProgressQuery) PlayerProgress }
     class ClearLocalProgressUseCase { +execute(ClearLocalProgressCommand) void }
+    class RestorePlayerProgressUseCase { +execute(RestorePlayerProgressCommand) void }
     class GetLeaderboardUseCase { +execute(GetLeaderboardQuery) LeaderboardEntryResult[] }
     class SyncLeaderboardsUseCase { +execute(SyncLeaderboardsCommand) void }
 
@@ -504,13 +505,14 @@ classDiagram
     SyncProgressUseCase ..|> ICommandService
     LoadPlayerProgressUseCase ..|> IQueryService
     ClearLocalProgressUseCase ..|> ICommandService
+    RestorePlayerProgressUseCase ..|> ICommandService
     GetLeaderboardUseCase ..|> IQueryService
     SyncLeaderboardsUseCase ..|> ICommandService
 
     class IAuthRepository { <<interface>> }
     class ILeaderboardRepository { <<interface>> }
     class ILeaderboardCache { <<interface>> }
-    class IProgressSyncPort { <<interface>> }
+    class IProgressSyncPort { <<interface>> +sync() void +fetchAll() ProgressEntry[] }
     class ITokenStore { <<interface>> }
 
     RegisterUserUseCase --> IAuthRepository
@@ -524,6 +526,9 @@ classDiagram
     SyncProgressUseCase --> IProgressSyncPort
     LoadPlayerProgressUseCase --> IPlayerProgressRepository
     ClearLocalProgressUseCase --> IPlayerProgressRepository
+    RestorePlayerProgressUseCase --> ILevelRepository
+    RestorePlayerProgressUseCase --> IProgressSyncPort
+    RestorePlayerProgressUseCase --> IPlayerProgressRepository
     GetLeaderboardUseCase --> ILeaderboardRepository
     SyncLeaderboardsUseCase --> ILeaderboardRepository
     SyncLeaderboardsUseCase --> ILeaderboardCache
@@ -575,7 +580,7 @@ classDiagram
     class HttpAuthRepository { +register() void +login() LoginResult }
     class HttpLeaderboardRepository { +findTop() LeaderboardEntryResult[] }
     class HttpLevelRepository { -cachedLevels: Level[] +findAll() Level[] +findById() Level }
-    class HttpProgressSyncAdapter { +sync() void }
+    class HttpProgressSyncAdapter { +sync() void +fetchAll() ProgressEntry[] }
     class SqliteLeaderboardRepository { +findTop() LeaderboardEntryResult[] +replaceTop() void }
     class SqlitePlayerProgressRepository { +load() PlayerProgress +save() void }
 
@@ -622,7 +627,7 @@ en el diagrama UML. Su forma real:
 
 | Store | Estado expuesto | Casos de uso inyectados |
 | --- | --- | --- |
-| `createAuthStore` | `session, isAuthenticating, error` + `register, login, logout, restoreSession` | `RegisterUserUseCase`, `LoginUseCase`, `ClearLocalProgressUseCase`, `ITokenStore` |
+| `createAuthStore` | `session, isAuthenticating, error` + `register, login, logout, restoreSession` | `RegisterUserUseCase`, `LoginUseCase`, `ClearLocalProgressUseCase`, `RestorePlayerProgressUseCase`, `ITokenStore` |
 | `createGameStore` | `session: GameSession \| null, isLoading, error` + `startGame, moveArrow, rotateArrow, tick` | `StartGameUseCase`, `CompleteLevelUseCase`, `IAudioService` (sostiene un `GameCommandInvoker` interno) |
 | `createLevelsStore` | `levels, progress, isLoading, error` + `loadLevels, isUnlocked` | `GetLevelsUseCase`, `LoadPlayerProgressUseCase`, `SyncLeaderboardsUseCase` |
 | `createLeaderboardStore` | `entries, isLoading, error` + `loadLeaderboard` | `GetLeaderboardUseCase` |

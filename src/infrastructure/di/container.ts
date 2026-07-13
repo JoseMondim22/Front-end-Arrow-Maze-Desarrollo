@@ -23,6 +23,7 @@ import { CompleteLevelUseCase } from '../../application/use-cases/progress/Compl
 import { SyncProgressUseCase } from '../../application/use-cases/progress/SyncProgressUseCase';
 import { LoadPlayerProgressUseCase } from '../../application/use-cases/progress/LoadPlayerProgressUseCase';
 import { ClearLocalProgressUseCase } from '../../application/use-cases/progress/ClearLocalProgressUseCase';
+import { RestorePlayerProgressUseCase } from '../../application/use-cases/progress/RestorePlayerProgressUseCase';
 import { GetLeaderboardUseCase } from '../../application/use-cases/leaderboard/GetLeaderboardUseCase';
 import { SyncLeaderboardsUseCase } from '../../application/use-cases/leaderboard/SyncLeaderboardsUseCase';
 
@@ -86,6 +87,11 @@ const loadPlayerProgressUseCase = new LoadPlayerProgressUseCase(
   playerProgressRepository,
 );
 const clearLocalProgressUseCase = new ClearLocalProgressUseCase(playerProgressRepository);
+const restorePlayerProgressUseCase = new RestorePlayerProgressUseCase(
+  levelRepository,
+  progressSyncPort,
+  playerProgressRepository,
+);
 const getLeaderboardUseCase = new GetLeaderboardUseCase(localLeaderboardRepository);
 const syncLeaderboardsUseCase = new SyncLeaderboardsUseCase(
   remoteLeaderboardRepository,
@@ -168,6 +174,19 @@ const decoratedLoadPlayerProgressUseCase = new AuthGuardQueryDecorator(
   tokenStore,
 );
 
+// Runs right after LoginUseCase, which persists the token via ITokenStore
+// before returning — so the session is already active by the time this
+// AuthGuard check runs.
+const decoratedRestorePlayerProgressUseCase = new AuthGuardCommandDecorator(
+  new LoggingCommandDecorator(
+    restorePlayerProgressUseCase,
+    logger,
+    timeProvider,
+    'RestorePlayerProgressUseCase',
+  ),
+  tokenStore,
+);
+
 const decoratedGetLeaderboardUseCase = new AuthGuardQueryDecorator(
   new LoggingQueryDecorator(
     new CachingQueryDecorator(
@@ -225,6 +244,7 @@ export const useAuthStore = createAuthStore({
   registerUserUseCase: decoratedRegisterUserUseCase,
   loginUseCase: decoratedLoginUseCase,
   clearLocalProgressUseCase: decoratedClearLocalProgressUseCase,
+  restorePlayerProgressUseCase: decoratedRestorePlayerProgressUseCase,
   tokenStore,
 });
 
