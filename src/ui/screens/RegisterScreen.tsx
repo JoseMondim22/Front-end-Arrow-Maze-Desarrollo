@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuthStore } from '../../infrastructure/di/container';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { colors, radii, spacing, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
@@ -26,11 +27,13 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create account</Text>
+      <Text style={styles.title}>Join the maze!</Text>
+      <Text style={styles.subtitle}>Create your account</Text>
 
       <TextInput
         style={styles.input}
         placeholder="Username"
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         value={username}
         onChangeText={setUsername}
@@ -38,6 +41,7 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
@@ -46,6 +50,7 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor={colors.textMuted}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -54,7 +59,7 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
       {error !== null && <Text style={styles.error}>{error}</Text>}
 
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.button, isAuthenticating && styles.buttonDisabled]}
         disabled={isAuthenticating}
         onPress={() => void handleRegister()}
       >
@@ -71,23 +76,64 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.background,
+  },
+  title: {
+    ...typography.title,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
   input: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    borderColor: colors.border,
+    borderRadius: radii.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    ...typography.body,
+    color: colors.text,
   },
   button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 14,
+    backgroundColor: colors.secondary,
+    borderRadius: radii.full,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  buttonText: { color: '#fff', fontWeight: 'bold' },
-  link: { color: '#2563eb', textAlign: 'center', marginTop: 16 },
-  error: { color: '#dc2626', marginBottom: 8 },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    ...typography.button,
+    color: colors.surface,
+  },
+  link: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
+  error: {
+    ...typography.body,
+    color: colors.danger,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
 });
