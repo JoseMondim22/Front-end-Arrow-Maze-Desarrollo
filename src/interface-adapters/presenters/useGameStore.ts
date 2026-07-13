@@ -97,7 +97,7 @@ export function createGameStore(
     error: null,
 
     async startGame(level) {
-      set({ isLoading: true, error: null });
+      set({ session: null, isLoading: true, error: null });
       try {
         const session = await deps.startGameUseCase.execute({ levelId: level.id });
         invoker = new GameCommandInvoker(session);
