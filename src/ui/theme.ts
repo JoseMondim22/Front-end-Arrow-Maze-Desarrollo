@@ -17,13 +17,26 @@ export const colors = {
   textMuted: '#6b7280',
   border: '#e5e7eb',
 
-  // Board terrain (§6.2) and chain colors — swappable for real sprites later
-  // without touching any component's logic.
+  // Board terrain (§6.2) — swappable for real sprites later without touching
+  // any component's logic.
   wall: '#4b5563',
   empty: '#f3f4f6',
   exit: '#22c55e',
-  chain: '#6366f1',
 } as const;
+
+// One is picked at random per ArrowChain (ChainView, keyed by chainId so the
+// pick stays stable across re-renders) so multiple snakes on the same board
+// read as visually distinct instead of one big undifferentiated purple mass.
+export const chainPalette = [
+  '#6366f1',
+  '#22c55e',
+  '#f97316',
+  '#ec4899',
+  '#06b6d4',
+  '#eab308',
+  '#8b5cf6',
+  '#14b8a6',
+] as const;
 
 export const radii = { sm: 8, md: 12, lg: 20, full: 999 } as const;
 
