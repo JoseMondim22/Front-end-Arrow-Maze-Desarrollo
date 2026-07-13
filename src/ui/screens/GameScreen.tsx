@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useGameStore } from '../../infrastructure/di/container';
 import { BoardView } from '../components/BoardView';
@@ -22,8 +22,20 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const rotateArrow = useGameStore((state) => state.rotateArrow);
   const tick = useGameStore((state) => state.tick);
 
+  // Gates the terminal-status effect below until THIS mount's startGame() has
+  // actually resolved. Without it, on first mount both effects fire in the
+  // same commit against the store's *previous* session (e.g. a leftover
+  // Victory from the last level) — startGame's set({session: null, ...}) only
+  // schedules a re-render, it doesn't happen before the sibling effect below
+  // runs, so that effect would still see the stale terminal session and
+  // redirect immediately, before the new level even loads.
+  const hasLoadedRef = useRef(false);
+
   useEffect(() => {
-    void startGame(level);
+    hasLoadedRef.current = false;
+    void startGame(level).then(() => {
+      hasLoadedRef.current = true;
+    });
   }, [level, startGame]);
 
   // GameSession.tick() no-ops once the session leaves Playing (§6.5), so this can
@@ -35,7 +47,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   }, [tick]);
 
   useEffect(() => {
-    if (session === null) {
+    if (!hasLoadedRef.current || session === null) {
       return;
     }
     if (session.status.name === 'Victory' && session.finalScore !== null) {
