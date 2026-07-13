@@ -1,11 +1,28 @@
-import { StyleSheet, Text, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { RootStackParamList } from '../navigation/RootNavigator';
+import { colors, radii, spacing, typography } from '../theme';
 
-/** Placeholder Home screen — proves the navigation + Expo pipeline works end to
- * end before the real screens (with board rendering, presenters, etc.) are built. */
-export function HomeScreen(): React.JSX.Element {
+type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+
+export function HomeScreen({ navigation }: Props): React.JSX.Element {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Arrow Maze</Text>
+
+      <TouchableOpacity
+        style={styles.playButton}
+        onPress={() => navigation.navigate('LevelSelect')}
+      >
+        <Text style={styles.playButtonText}>Play</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.settingsButton}
+        onPress={() => navigation.navigate('Settings')}
+      >
+        <Text style={styles.settingsButtonText}>Settings</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -15,10 +32,27 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
+    padding: spacing.lg,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  title: { ...typography.title, color: colors.text, marginBottom: spacing.xl },
+  playButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radii.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
+  playButtonText: { ...typography.button, color: colors.surface },
+  settingsButton: {
+    borderRadius: radii.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  settingsButtonText: { ...typography.body, color: colors.textMuted },
 });
