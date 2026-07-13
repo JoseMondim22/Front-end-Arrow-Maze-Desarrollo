@@ -9,11 +9,22 @@ interface Props {
   cellSize: number;
   onMove: () => void;
   onRotate: () => void;
+  /** True for the ghost BoardView keeps mounted after a chain exits (§6.4:
+   * ArrowChainExited removes it from GameSession.view in the same tick it
+   * happens), so it can play an exit animation instead of vanishing. */
+  isExiting?: boolean;
+  /** How many extra cells to keep sliding straight past the exit tile, once
+   * every segment has caught up to where the one ahead of it used to be.
+   * BoardView sizes this from the board's own row/column count so the whole
+   * chain is guaranteed to clear the visible (overflow: hidden) area. */
+  exitTravelCells?: number;
+  onExitAnimationEnd?: () => void;
 }
 
 const DOUBLE_TAP_WINDOW_MS = 300;
 const SLIDE_DURATION_MS = 180;
 const ROTATE_DURATION_MS = 150;
+const EXIT_STEP_DURATION_MS = 130;
 
 function rotationDegreesFor(directionId: string): number {
   switch (directionId) {
@@ -27,6 +38,23 @@ function rotationDegreesFor(directionId: string): number {
       return 270;
     default:
       return 0;
+  }
+}
+
+/** Unit step in the head's direction — used to keep extending the trail
+ * straight past the exit tile once the chain has no more real nodes to follow. */
+function directionDelta(directionId: string): { x: number; y: number } {
+  switch (directionId) {
+    case 'up':
+      return { x: 0, y: -1 };
+    case 'right':
+      return { x: 1, y: 0 };
+    case 'down':
+      return { x: 0, y: 1 };
+    case 'left':
+      return { x: -1, y: 0 };
+    default:
+      return { x: 0, y: 0 };
   }
 }
 
@@ -109,6 +137,63 @@ function useHeadRotationAnimation(directionId: string): Animated.Value {
   return rotationValue;
 }
 
+/** Once a chain exits, there are no more real nodes to follow, so this fakes
+ * the rest of the trail purely in pixels: segment `i` walks through the exact
+ * spots segment `i + 1` used to occupy (the same "follow the one ahead" rule
+ * moveArrow itself uses), then — once it runs out of real ancestors — keeps
+ * going straight in the head's direction for `travelCells` more, guaranteeing
+ * it clears the board's `overflow: hidden` area instead of stopping in view. */
+function useExitAnimation(params: {
+  isExiting: boolean;
+  segments: readonly GridPosition[];
+  headDirectionId: string;
+  cellSize: number;
+  travelCells: number;
+  segmentAnimations: Animated.ValueXY[];
+  onDone?: () => void;
+}): void {
+  const { isExiting, segments, headDirectionId, cellSize, travelCells, segmentAnimations, onDone } =
+    params;
+
+  useEffect(() => {
+    if (!isExiting) {
+      return;
+    }
+    const basePositions = segments.map((position) => pixelsOf(position, cellSize));
+    const headBase = basePositions[basePositions.length - 1];
+    const delta = directionDelta(headDirectionId);
+    const deltaPx = { x: delta.x * cellSize, y: delta.y * cellSize };
+    const extraSteps = Math.max(1, travelCells);
+
+    const trails = segmentAnimations.map((anim, index) => {
+      const waypoints: Array<{ x: number; y: number }> = [];
+      for (let ahead = index + 1; ahead < basePositions.length; ahead += 1) {
+        waypoints.push(basePositions[ahead]);
+      }
+      for (let step = 1; step <= extraSteps; step += 1) {
+        waypoints.push({ x: headBase.x + deltaPx.x * step, y: headBase.y + deltaPx.y * step });
+      }
+      return Animated.sequence(
+        waypoints.map((point) =>
+          Animated.timing(anim, {
+            toValue: point,
+            duration: EXIT_STEP_DURATION_MS,
+            useNativeDriver: true,
+          }),
+        ),
+      );
+    });
+
+    Animated.parallel(trails).start(({ finished }) => {
+      if (finished) {
+        onDone?.();
+      }
+    });
+    // Runs once, the moment this ghost instance mounts with isExiting=true.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExiting]);
+}
+
 /**
  * §6.4: a single tap slides the chain (moveArrow), a double tap (within
  * DOUBLE_TAP_WINDOW_MS) rotates its head instead (rotateArrow). React Native has
@@ -116,13 +201,34 @@ function useHeadRotationAnimation(directionId: string): Animated.Value {
  * if a second one arrives before committing to a move. Any segment (head or
  * body) can be tapped — the whole chain is one unit.
  */
-export function ChainView({ chain, cellSize, onMove, onRotate }: Props): React.JSX.Element {
+export function ChainView({
+  chain,
+  cellSize,
+  onMove,
+  onRotate,
+  isExiting = false,
+  exitTravelCells = 0,
+  onExitAnimationEnd,
+}: Props): React.JSX.Element {
   const lastTapAt = useRef(0);
   const pendingMove = useRef<ReturnType<typeof setTimeout> | null>(null);
   const segmentAnimations = useSegmentAnimations(chain.segments, cellSize);
   const rotationDegrees = useHeadRotationAnimation(chain.headDirection.id);
 
+  useExitAnimation({
+    isExiting,
+    segments: chain.segments,
+    headDirectionId: chain.headDirection.id,
+    cellSize,
+    travelCells: exitTravelCells,
+    segmentAnimations,
+    onDone: onExitAnimationEnd,
+  });
+
   const handlePress = (): void => {
+    if (isExiting) {
+      return;
+    }
     const now = Date.now();
     if (now - lastTapAt.current < DOUBLE_TAP_WINDOW_MS) {
       if (pendingMove.current !== null) {
@@ -158,10 +264,12 @@ export function ChainView({ chain, cellSize, onMove, onRotate }: Props): React.J
                 transform: anim.getTranslateTransform(),
               },
             ]}
+            pointerEvents={isExiting ? 'none' : 'auto'}
           >
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handlePress}
+              disabled={isExiting}
               style={styles.touchArea}
             >
               <View style={styles.body}>
