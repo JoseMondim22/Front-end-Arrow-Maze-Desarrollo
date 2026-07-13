@@ -164,8 +164,15 @@ const decoratedGetLeaderboardUseCase = new AuthGuardQueryDecorator(
 // Consumed directly by UI/audio code, not through any use case (§4). Instantiated
 // here (before the presenters) because useGameStore now also depends on it to
 // play sound effects on game events (§4: "the store... republishes to UI and audio").
-// TODO: pass the real effect id -> asset map once sound files exist.
-export const audioService = ExpoAudioService.getInstance({});
+// The effect id -> asset map mirrors the SFX ids useGameStore plays (see SFX
+// there): chain-exit, blocked, rotate, victory, defeat.
+export const audioService = ExpoAudioService.getInstance({
+  'chain-exit': require('../../../assets/sounds/chain-exit.mp3'),
+  blocked: require('../../../assets/sounds/blocked.mp3'),
+  rotate: require('../../../assets/sounds/rotate.mp3'),
+  victory: require('../../../assets/sounds/victory.mp3'),
+  defeat: require('../../../assets/sounds/defeat.mp3'),
+});
 export const localizationService = new I18nLocalizationService();
 
 // --- Capa 3: presenters (Zustand), wired with the decorated use cases -------
