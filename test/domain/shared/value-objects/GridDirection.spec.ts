@@ -1,3 +1,4 @@
+import { DomainError } from '@domain/shared/errors/DomainError';
 import { GridDirection } from '@domain/shared/value-objects/GridDirection';
 
 describe('GridDirection', () => {
@@ -11,5 +12,16 @@ describe('GridDirection', () => {
   it('should_be_equal_when_same_id', () => {
     expect(GridDirection.Up.equals(GridDirection.Up)).toBe(true);
     expect(GridDirection.Up.equals(GridDirection.Down)).toBe(false);
+  });
+
+  it('should_resolve_a_singleton_when_id_is_valid', () => {
+    expect(GridDirection.of('up')).toBe(GridDirection.Up);
+    expect(GridDirection.of('right')).toBe(GridDirection.Right);
+    expect(GridDirection.of('down')).toBe(GridDirection.Down);
+    expect(GridDirection.of('left')).toBe(GridDirection.Left);
+  });
+
+  it('should_fail_when_id_is_not_a_known_direction', () => {
+    expect(() => GridDirection.of('north')).toThrow(DomainError);
   });
 });
