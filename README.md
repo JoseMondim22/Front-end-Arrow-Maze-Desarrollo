@@ -23,6 +23,7 @@ clases real** del código, no el aspiracional.
   - [2. Dominio — kernel compartido](#2-dominio--kernel-compartido-cells-value-objects-scoring-events)
   - [3. Aplicación — casos de uso y CQS](#3-aplicación--casos-de-uso-y-cqs)
   - [4. Adaptadores e infraestructura](#4-adaptadores-e-infraestructura)
+- [AOP — decoradores implementados](#aop--decoradores-implementados)
 - [Reglas del juego](#reglas-del-juego-invariantes-de-gamesession)
 - [Arquitectura de testing](#arquitectura-de-testing)
 - [Cómo correr el proyecto](#cómo-correr-el-proyecto)
@@ -630,6 +631,111 @@ en el diagrama UML. Su forma real:
 concretos de arriba, arma la cadena de decoradores (`AuthGuard → Logging →
 Performance/Caching → caso de uso real`) y crea los 4 stores — es el único archivo del
 proyecto que conoce clases concretas.
+
+---
+
+## AOP — decoradores implementados
+
+El proyecto **no usa ninguna librería de AOP** (nada de `reflect-metadata`, decoradores
+`@Injectable`/`@Around`, etc.). Los *cross-cutting concerns* (logging, autenticación,
+performance, cache) se resuelven con el patrón **GoF Decorator** aplicado sobre los dos
+puertos CQS de método único (`ICommandService<TCommand>` / `IQueryService<TQuery, TResult>`):
+cada aspecto es una clase que implementa el **mismo puerto** que el caso de uso que envuelve
+y delega en él por composición (`decoratee`). El caso de uso real nunca sabe que está
+decorado — nunca llama al logger, nunca revisa la sesión.
+
+Viven todos en `src/interface-adapters/decorators/`, un archivo por decorador, **cada uno
+con su par Command/Query** para no romper CQS mezclando ambos puertos en una sola clase:
+
+| Decorador | Puerto | Qué hace | Dependencias |
+| --- | --- | --- | --- |
+| `AuthGuardCommandDecorator` / `AuthGuardQueryDecorator` | `ICommandService` / `IQueryService` | Antes de delegar, llama a `tokenStore.hasActiveSession()`; si no hay sesión activa, lanza `Error('Not authenticated')` y **ni siquiera invoca** al `decoratee`. | `ITokenStore` |
+| `LoggingCommandDecorator` / `LoggingQueryDecorator` | `ICommandService` / `IQueryService` | Loguea `"<caso> started"` antes, y `"<caso> completed"` (con `durationMs`) o `"<caso> failed"` (con el error) después — en un `try/catch` que siempre re-lanza, para no tragarse errores. | `ILogger`, `ITimeProvider`, `useCaseName` |
+| `PerformanceQueryDecorator` | `IQueryService` | Mide la duración con `ITimeProvider` y solo emite un `logger.warn(...)` si supera `slowThresholdMs` (1000ms por defecto). A diferencia de `LoggingQueryDecorator`, que narra **toda** llamada, este solo se queja de las **lentas** — un concern distinto, una clase distinta. | `ILogger`, `ITimeProvider`, `slowThresholdMs` |
+| `CachingQueryDecorator` | `IQueryService` | Memoiza el resultado en un `Map` interno con TTL (`expiresAt`), usando una función `keyOf(query)` inyectada para construir la clave de cache — así es genérico sobre cualquier query, no conoce `GetLeaderboardUseCase` ni ningún caso de uso concreto. | `ITimeProvider`, `ttlMs`, `keyOf` |
+
+No existe una versión *Caching* ni *Performance* del lado Command a propósito: mutar no es
+cacheable, y por ahora ningún command es lo bastante costoso como para justificar medirlo.
+
+### Cómo se arman las cadenas (composición, no herencia)
+
+El Composition Root (`infrastructure/di/container.ts`) decide, caso de uso por caso de uso,
+qué decoradores aplicar y en qué orden — el orden importa: **AuthGuard va afuera de todo**
+para no gastar tiempo en logging/caching de una llamada que ni siquiera está autenticada.
+
+```
+AuthGuard → Logging → Performance / Caching → caso de uso real
+```
+
+Ejemplos reales tomados de `container.ts`:
+
+```ts
+// Query protegida simple (§14: Auth ✅)
+const decoratedGetLevelsUseCase = new AuthGuardQueryDecorator(
+  new LoggingQueryDecorator(getLevelsUseCase, logger, timeProvider, 'GetLevelsUseCase'),
+  tokenStore,
+);
+
+// Query protegida y costosa: Performance queda pegado al caso de uso real,
+// Logging por fuera de Performance, AuthGuard por fuera de todo.
+const decoratedStartGameUseCase = new AuthGuardQueryDecorator(
+  new LoggingQueryDecorator(
+    new PerformanceQueryDecorator(startGameUseCase, logger, timeProvider, 'StartGameUseCase'),
+    logger, timeProvider, 'StartGameUseCase',
+  ),
+  tokenStore,
+);
+
+// Query protegida y cacheable: Caching queda pegado al caso de uso real
+// (para que Logging reporte el tiempo real de la llamada, hit o miss).
+const decoratedGetLeaderboardUseCase = new AuthGuardQueryDecorator(
+  new LoggingQueryDecorator(
+    new CachingQueryDecorator(
+      getLeaderboardUseCase, timeProvider, 60_000,
+      (query) => `${query.levelId.toString()}:${query.limit}`,
+    ),
+    logger, timeProvider, 'GetLeaderboardUseCase',
+  ),
+  tokenStore,
+);
+
+// Command público (§14: Auth ❌) — login/registro no pueden exigir sesión
+// para conseguir una sesión, así que no llevan AuthGuard.
+const decoratedLoginUseCase = new LoggingQueryDecorator(loginUseCase, logger, timeProvider, 'LoginUseCase');
+```
+
+`ClearLocalProgressUseCase` es la única excepción documentada a la regla "todo lo protegido
+lleva AuthGuard": corre desde `logout()`, potencialmente **después** de que la sesión ya se
+borró, así que solo lleva `Logging` — exigir sesión activa para limpiar datos locales al
+cerrar sesión sería una contradicción.
+
+### SOLID en esta implementación
+
+- **S — Single Responsibility.** Cada decorador tiene **una** razón de cambio:
+  `AuthGuardCommandDecorator` solo sabe verificar sesión, `LoggingCommandDecorator` solo sabe
+  narrar entrada/salida/duración, `CachingQueryDecorator` solo sabe memoizar. El caso de uso
+  real conserva su única responsabilidad (la regla de negocio) sin mezclarse con logging o
+  auth — si mañana cambia el formato de los logs, se toca `LoggingQueryDecorator` y ningún
+  caso de uso.
+- **O — Open/Closed.** Agregar un aspecto nuevo (por ejemplo, un `RetryQueryDecorator`) es
+  **crear una clase nueva** que implemente `IQueryService`, sin tocar ni el caso de uso ni
+  los decoradores existentes. `CachingQueryDecorator` es además genérico sobre
+  `TQuery`/`TResult` — sirve para cualquier query futura sin modificarlo, el Composition Root
+  es quien decide a cuál envolver.
+- **L — Liskov Substitution.** Cualquier decorador es sustituible en cualquier lugar donde se
+  espera un `ICommandService<TCommand>`/`IQueryService<TQuery, TResult>`: por eso se pueden
+  anidar sin que el código que los consume (los presenters) note la diferencia entre un caso
+  de uso "pelado" y una cadena de 3 decoradores — todos cumplen el mismo contrato.
+- **I — Interface Segregation.** `ICommandService`/`IQueryService` son interfaces de **un
+  solo método** (`execute`). Ningún decorador se ve forzado a implementar algo que no usa;
+  contrastá esto con una interfaz gorda tipo `IUseCase` con `executeCommand()` +
+  `executeQuery()`, que obligaría a cada decorador Command a cargar con un método Query vacío.
+- **D — Dependency Inversion.** Los decoradores dependen de **abstracciones**: el
+  `decoratee` es del tipo del puerto (`ICommandService`/`IQueryService`), nunca de la clase
+  concreta del caso de uso; y las dependencias técnicas (`ILogger`, `ITimeProvider`,
+  `ITokenStore`) son interfaces de `application/ports/`, no `ConsoleLogger`/
+  `SystemTimeProvider`/`SecureTokenStore` directamente. Solo `container.ts` conoce esas
+  clases concretas — los decoradores ni se enteran.
 
 ---
 
