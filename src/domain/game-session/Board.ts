@@ -150,13 +150,29 @@ export class Board {
     return { board: this, outcome: 'Reverted' };
   }
 
-  /** Rotate one chain's head 90 clockwise, returning a new board. */
+  /**
+   * Rotate one chain's head 90 clockwise, returning a new board. A chain with a
+   * body (length > 1) can never face its own neck — that orientation would point
+   * the arrow straight into itself, which is not a real move option — so that one
+   * direction out of the four is skipped, landing on the next clockwise heading.
+   */
   rotateChain(chainId: ChainId): Board {
-    this.findChain(chainId);
-    const rotated = this.activeChains.map((chain) =>
-      chain.id.equals(chainId) ? chain.rotate() : chain,
-    );
-    return new Board(this.terrain, this.positions, this.adjacency, rotated);
+    const chain = this.findChain(chainId);
+    const neck = chain.nodeIds.length > 1 ? chain.nodeIds[chain.nodeIds.length - 2] : null;
+
+    let rotated = chain.rotate();
+    if (neck !== null) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const facing = this.neighbourOf(chain.head, rotated.direction);
+        if (facing === null || !facing.equals(neck)) {
+          break;
+        }
+        rotated = rotated.rotate();
+      }
+    }
+
+    const updatedChains = this.activeChains.map((c) => (c.id.equals(chainId) ? rotated : c));
+    return new Board(this.terrain, this.positions, this.adjacency, updatedChains);
   }
 
   /**

@@ -31,7 +31,8 @@ function rotationDegreesFor(directionId: string): number {
  * §6.4: a single tap slides the chain (moveArrow), a double tap (within
  * DOUBLE_TAP_WINDOW_MS) rotates its head instead (rotateArrow). React Native has
  * no built-in double-tap gesture, so the first tap is held back briefly to see
- * if a second one arrives before committing to a move.
+ * if a second one arrives before committing to a move. Any segment (head or
+ * body) can be tapped — the whole chain is one unit.
  */
 export function ChainView({ chain, cellSize, onMove, onRotate }: Props): React.JSX.Element {
   const lastTapAt = useRef(0);

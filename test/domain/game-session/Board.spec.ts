@@ -89,6 +89,20 @@ describe('Board', () => {
     expect(chainB?.direction.id).toBe('right'); // untouched
   });
 
+  it('should_skip_the_heading_that_faces_its_own_neck_when_rotating', () => {
+    // Folded chain a -> b -> c -> d, head at d, currently facing 'up'.
+    // d's neighbours: 'right' = exit, 'down' = c (the neck), 'left' = a.
+    const board = BoardMother.uShapedChainFacingWall();
+
+    const facingExit = board.rotateChain(ChainId.of('c1')); // up -> right (exit)
+    expect(facingExit.chains[0].direction.id).toBe('right');
+
+    // Naive clockwise step would be right -> down, but down points straight into
+    // the neck (c), so it must be skipped in favor of the next heading, left.
+    const facingAway = facingExit.rotateChain(ChainId.of('c1'));
+    expect(facingAway.chains[0].direction.id).toBe('left');
+  });
+
   it('should_expose_every_node_position_and_terrain_kind_in_the_render_view', () => {
     const board = BoardMother.straightPathToExit();
 
