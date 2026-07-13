@@ -222,9 +222,13 @@ cumplir su función completa: **Abstract Factory** (solo hay Factory Method, no 
 fábricas), **Builder** (`BoardBuilder` arma el `Board` en pasos, pero desde un `BoardDefinition`
 ya parseado, no desde JSON/YAML, y no ensambla reglas ni elementos opcionales), **Facade** (no
 existe ningún `GameServiceFacade` ni equivalente), **Template Method** (`Level` es una clase
-concreta, no hay una `BaseLevel` abstracta con subclases), y **Command** (`MoveArrowCommand`/
+concreta, no hay una `BaseLevel` abstracta con subclases), **Command** (`MoveArrowCommand`/
 `GameCommandInvoker` encapsulan la acción, pero el proyecto decidió explícitamente no tener
-historial ni undo/redo, que es parte de la función pedida).
+historial ni undo/redo, que es parte de la función pedida), **Composite** (`BoardView` agrupa
+`CellView`/`ChainView` en dos listas, pero no hay una interfaz común entre ambos ni estructura
+recursiva — no es Composite, es un simple agregado de lectura) y **Observer** (`GameEvent` se
+acumula y se drena con `pullEvents()`, no hay un mecanismo real de `subscribe`/`notify` con
+observadores registrados dinámicamente).
 
 ### Creacionales
 
@@ -278,29 +282,6 @@ export class ExpoAudioService implements IAudioService {
 
 ### Estructurales
 
-#### Composite
-
-`BoardView` uniforma celdas sueltas y cadenas de varios nodos bajo la misma proyección de
-solo-lectura para pintar — la UI no distingue "una celda" de "un tren de nodos":
-
-```typescript
-// src/domain/game-session/BoardView.ts
-export class ChainView {
-  constructor(
-    readonly chainId: ChainId,
-    readonly segments: readonly GridPosition[],
-    readonly headDirection: Direction,
-  ) {}
-}
-
-export class BoardView {
-  constructor(
-    readonly cells: readonly CellView[],
-    readonly chains: readonly ChainView[],
-  ) {}
-}
-```
-
 #### Adapter
 
 `HttpClient` adapta `fetch` (red) al puerto `IHttpClient`; `SqlitePlayerProgressRepository`
@@ -343,32 +324,6 @@ export interface ScoringStrategy {
 export class FailedMovesScoringStrategy implements ScoringStrategy {
   constructor(private readonly failedMoveWeight: number = 1) {}
   score(input: ScoringInput): Score { /* penaliza solo movimientos fallidos */ }
-}
-```
-
-#### Observer
-
-`GameSession` acumula `GameEvent` (`ArrowChainExited`, `LevelCompleted`) durante una
-transición; el store los drena con `pullEvents()` y notifica a la UI y al audio:
-
-```typescript
-// src/domain/shared/events/GameEvent.ts
-export interface GameEvent {
-  readonly name: string;
-}
-export class ArrowChainExited implements GameEvent {
-  readonly name = 'ArrowChainExited' as const;
-  constructor(readonly chainId: ChainId) {}
-}
-
-// src/domain/game-session/GameSession.ts
-pullEvents(): readonly GameEvent[] {
-  return this.state.events;
-}
-
-// src/interface-adapters/presenters/useGameStore.ts
-if (session.pullEvents().some((event) => event.name === 'ArrowChainExited')) {
-  void deps.audioService.playEffect(SFX.chainExit);
 }
 ```
 
