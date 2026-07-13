@@ -19,4 +19,16 @@ describe('GetLevelsUseCase', () => {
 
     testAPI.thenLevelsWereReturned([]);
   });
+
+  it('should_sort_levels_by_order_when_repository_returns_them_out_of_order', async () => {
+    const testAPI = new GetLevelsTestAPI();
+    const third = LevelMother.atOrder(3);
+    const first = LevelMother.atOrder(1);
+    const second = LevelMother.atOrder(2);
+    testAPI.givenLevelsExist(third, first, second);
+
+    await testAPI.whenListingLevels();
+
+    testAPI.thenLevelsWereReturned([first, second, third]);
+  });
 });
