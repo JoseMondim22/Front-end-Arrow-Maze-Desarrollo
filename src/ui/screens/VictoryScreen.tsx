@@ -22,9 +22,20 @@ export function VictoryScreen({ route, navigation }: Props): React.JSX.Element {
     void loadLeaderboard({ levelId: level.id, limit: LEADERBOARD_LIMIT });
   }, [level, loadLeaderboard]);
 
+  // navigate() no longer pops back to an existing screen in the stack (RN v7
+  // change) — it pushes a new one, leaving this Victory screen buried
+  // underneath. popTo() is v7's explicit replacement for "go back to a
+  // screen already in the stack, discarding everything above it."
   const handleNext = async (): Promise<void> => {
     await loadLevels();
-    navigation.navigate('LevelSelect');
+    const nextLevel = useLevelsStore
+      .getState()
+      .levels.find((candidate) => candidate.order.sequence === level.order.sequence + 1);
+    if (nextLevel !== undefined) {
+      navigation.replace('Game', { level: nextLevel });
+    } else {
+      navigation.popTo('LevelSelect');
+    }
   };
 
   return (
