@@ -19,7 +19,6 @@ export interface GameStoreState {
   startGame(level: Level): Promise<void>;
   moveArrow(chainId: ChainId): void;
   rotateArrow(chainId: ChainId): void;
-  undo(): void;
   tick(elapsedSeconds: number): void;
 }
 
@@ -95,13 +94,6 @@ export function createGameStore(
         return;
       }
       set({ session: invoker.execute(new RotateArrowCommand(chainId)) });
-    },
-
-    undo() {
-      if (invoker === null) {
-        return;
-      }
-      set({ session: invoker.undo() });
     },
 
     tick(elapsedSeconds) {
