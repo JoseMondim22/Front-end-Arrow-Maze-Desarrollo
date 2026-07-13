@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radii, spacing, typography } from '../theme';
 
@@ -25,22 +26,23 @@ export function HUD({
   timeUsedSeconds,
   timeLimitSeconds,
 }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const timeLeft = timeLimitSeconds - timeUsedSeconds;
 
   return (
     <View style={styles.container}>
       <View style={styles.stat}>
-        <Text style={styles.label}>Moves</Text>
+        <Text style={styles.label}>{t('hud.moves')}</Text>
         <Text style={styles.value}>
           {movesUsed}/{maxMoves}
         </Text>
       </View>
       <View style={styles.stat}>
-        <Text style={styles.label}>Time left</Text>
+        <Text style={styles.label}>{t('hud.timeLeft')}</Text>
         <Text style={styles.value}>{formatSeconds(timeLeft)}</Text>
       </View>
       <View style={styles.stat}>
-        <Text style={styles.label}>Chains left</Text>
+        <Text style={styles.label}>{t('hud.chainsLeft')}</Text>
         <Text style={styles.value}>{activeChainCount}</Text>
       </View>
     </View>

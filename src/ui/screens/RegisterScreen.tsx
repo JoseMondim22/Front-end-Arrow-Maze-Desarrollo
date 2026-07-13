@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuthStore } from '../../infrastructure/di/container';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -8,6 +9,7 @@ import { colors, radii, spacing, typography } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 export function RegisterScreen({ navigation }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
@@ -27,12 +29,12 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Join the maze!</Text>
-      <Text style={styles.subtitle}>Create your account</Text>
+      <Text style={styles.title}>{t('auth.register.title')}</Text>
+      <Text style={styles.subtitle}>{t('auth.register.subtitle')}</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Username"
+        placeholder={t('auth.register.usernamePlaceholder')}
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         value={username}
@@ -40,7 +42,7 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
       />
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder={t('auth.register.emailPlaceholder')}
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         keyboardType="email-address"
@@ -49,7 +51,7 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
       />
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder={t('auth.register.passwordPlaceholder')}
         placeholderTextColor={colors.textMuted}
         secureTextEntry
         value={password}
@@ -64,12 +66,12 @@ export function RegisterScreen({ navigation }: Props): React.JSX.Element {
         onPress={() => void handleRegister()}
       >
         <Text style={styles.buttonText}>
-          {isAuthenticating ? 'Loading...' : 'Register'}
+          {isAuthenticating ? t('common.loading') : t('auth.register.submit')}
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.link}>Already have an account? Login</Text>
+        <Text style={styles.link}>{t('auth.register.hasAccount')}</Text>
       </TouchableOpacity>
     </View>
   );

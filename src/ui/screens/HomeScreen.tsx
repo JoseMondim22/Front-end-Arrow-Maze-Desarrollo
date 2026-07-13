@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors, radii, spacing, typography } from '../theme';
@@ -6,22 +7,24 @@ import { colors, radii, spacing, typography } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export function HomeScreen({ navigation }: Props): React.JSX.Element {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Arrow Maze</Text>
+      <Text style={styles.title}>{t('app.name')}</Text>
 
       <TouchableOpacity
         style={styles.playButton}
         onPress={() => navigation.navigate('LevelSelect')}
       >
-        <Text style={styles.playButtonText}>Play</Text>
+        <Text style={styles.playButtonText}>{t('common.play')}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.settingsButton}
         onPress={() => navigation.navigate('Settings')}
       >
-        <Text style={styles.settingsButtonText}>Settings</Text>
+        <Text style={styles.settingsButtonText}>{t('common.settings')}</Text>
       </TouchableOpacity>
     </View>
   );

@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { audioService, localizationService, useAuthStore } from '../../infrastructure/di/container';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -9,7 +10,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 // audioService/localizationService are consumed directly (per §4) — they are
 // technical services, not use cases, so they don't belong behind a Zustand store.
+// Toggling the locale calls i18next.changeLanguage() under the hood, so every
+// useTranslation() consumer in the app (not just this screen) re-renders in sync.
 export function SettingsScreen({ navigation }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const [muted, setMuted] = useState(false);
   const [locale, setLocale] = useState(localizationService.getLocale());
   const logout = useAuthStore((state) => state.logout);
@@ -36,20 +40,20 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Settings</Text>
+      <Text style={styles.title}>{t('settings.title')}</Text>
 
       <View style={styles.row}>
-        <Text style={styles.rowLabel}>Mute sound</Text>
+        <Text style={styles.rowLabel}>{t('settings.muteSound')}</Text>
         <Switch value={muted} onValueChange={toggleMuted} />
       </View>
 
       <TouchableOpacity style={styles.row} onPress={toggleLocale}>
-        <Text style={styles.rowLabel}>Language</Text>
+        <Text style={styles.rowLabel}>{t('settings.language')}</Text>
         <Text style={styles.rowValue}>{locale.toUpperCase()}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={() => void handleLogout()}>
-        <Text style={styles.logoutText}>Log out</Text>
+        <Text style={styles.logoutText}>{t('settings.logout')}</Text>
       </TouchableOpacity>
     </View>
   );

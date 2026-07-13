@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuthStore } from '../../infrastructure/di/container';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -8,6 +9,7 @@ import { colors, radii, spacing, typography } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const login = useAuthStore((state) => state.login);
@@ -16,12 +18,12 @@ export function LoginScreen({ navigation }: Props): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Arrow Maze</Text>
-      <Text style={styles.subtitle}>Welcome back!</Text>
+      <Text style={styles.title}>{t('app.name')}</Text>
+      <Text style={styles.subtitle}>{t('auth.login.welcome')}</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder={t('auth.login.emailPlaceholder')}
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         keyboardType="email-address"
@@ -30,7 +32,7 @@ export function LoginScreen({ navigation }: Props): React.JSX.Element {
       />
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder={t('auth.login.passwordPlaceholder')}
         placeholderTextColor={colors.textMuted}
         secureTextEntry
         value={password}
@@ -45,12 +47,12 @@ export function LoginScreen({ navigation }: Props): React.JSX.Element {
         onPress={() => login({ email, password })}
       >
         <Text style={styles.buttonText}>
-          {isAuthenticating ? 'Loading...' : 'Login'}
+          {isAuthenticating ? t('common.loading') : t('auth.login.submit')}
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-        <Text style={styles.link}>No account? Register</Text>
+        <Text style={styles.link}>{t('auth.login.noAccount')}</Text>
       </TouchableOpacity>
     </View>
   );

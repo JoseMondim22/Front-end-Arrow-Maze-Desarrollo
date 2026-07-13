@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLevelsStore } from '../../infrastructure/di/container';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -7,6 +8,7 @@ import { colors, radii, spacing, typography } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Victory'>;
 
 export function VictoryScreen({ route, navigation }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const { score } = route.params;
   const loadLevels = useLevelsStore((state) => state.loadLevels);
 
@@ -18,11 +20,11 @@ export function VictoryScreen({ route, navigation }: Props): React.JSX.Element {
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>🎉</Text>
-      <Text style={styles.title}>Victory!</Text>
-      <Text style={styles.score}>{score} points</Text>
+      <Text style={styles.title}>{t('victory.title')}</Text>
+      <Text style={styles.score}>{t('victory.points', { score })}</Text>
 
       <TouchableOpacity style={styles.button} onPress={() => void handleNext()}>
-        <Text style={styles.buttonText}>Next level</Text>
+        <Text style={styles.buttonText}>{t('victory.next')}</Text>
       </TouchableOpacity>
     </View>
   );

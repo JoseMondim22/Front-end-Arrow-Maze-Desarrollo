@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLevelsStore } from '../../infrastructure/di/container';
 import { Level } from '../../domain/level/Level';
@@ -11,6 +12,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'LevelSelect'>;
 /** §16: progress + locked levels. Zero game logic — unlock/completed/best score
  * all come straight from PlayerProgress via useLevelsStore. */
 export function LevelSelectScreen({ navigation }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const levels = useLevelsStore((state) => state.levels);
   const progress = useLevelsStore((state) => state.progress);
   const isLoading = useLevelsStore((state) => state.isLoading);
@@ -33,12 +35,18 @@ export function LevelSelectScreen({ navigation }: Props): React.JSX.Element {
         disabled={!unlocked}
         onPress={() => navigation.navigate('Game', { level: item })}
       >
-        <Text style={styles.cardTitle}>Level {item.order.sequence}</Text>
-        {!unlocked && <Text style={styles.cardSubtitle}>Locked</Text>}
+        <Text style={styles.cardTitle}>
+          {t('levelSelect.level', { order: item.order.sequence })}
+        </Text>
+        {!unlocked && <Text style={styles.cardSubtitle}>{t('levelSelect.locked')}</Text>}
         {unlocked && completed && (
-          <Text style={styles.cardSubtitle}>Best score: {bestScore}</Text>
+          <Text style={styles.cardSubtitle}>
+            {t('levelSelect.bestScore', { score: bestScore })}
+          </Text>
         )}
-        {unlocked && !completed && <Text style={styles.cardSubtitle}>Tap to play</Text>}
+        {unlocked && !completed && (
+          <Text style={styles.cardSubtitle}>{t('levelSelect.tapToPlay')}</Text>
+        )}
       </TouchableOpacity>
     );
   };
