@@ -56,13 +56,37 @@ export class HttpClient implements IHttpClient {
     });
 
     if (!response.ok) {
+      const bodyText = await response.text().catch(() => '');
+      const detail = extractErrorDetail(bodyText);
       throw new HttpError(
         response.status,
-        `Request failed: ${method} ${path} (${response.status})`,
+        `Request failed: ${method} ${path} (${response.status})${detail !== null ? ` — ${detail}` : ''}`,
       );
     }
 
     const text = await response.text();
     return (text.length === 0 ? undefined : JSON.parse(text)) as T;
   }
+}
+
+/** Backend error bodies (Nest's default ValidationPipe/HttpException shape) carry
+ * the actual reason under `message` — a string or, for validation failures, an
+ * array of per-field messages. Without this, every failed request only ever
+ * surfaced its HTTP status, never why the backend rejected it. */
+function extractErrorDetail(bodyText: string): string | null {
+  if (bodyText.length === 0) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(bodyText) as { message?: string | string[] };
+    if (Array.isArray(parsed.message)) {
+      return parsed.message.join(', ');
+    }
+    if (typeof parsed.message === 'string') {
+      return parsed.message;
+    }
+  } catch {
+    // Not JSON — fall through to the raw body below.
+  }
+  return bodyText;
 }
