@@ -10,6 +10,9 @@ module.exports = {
   moduleNameMapper: {
     '^@domain/(.*)$': '<rootDir>/src/domain/$1',
     '^@mothers/(.*)$': '<rootDir>/test/domain/_mothers/$1',
+    '^@application/(.*)$': '<rootDir>/src/application/$1',
+    '^@app-mothers/(.*)$': '<rootDir>/test/application/_mothers/$1',
+    '^@testing-apis/(.*)$': '<rootDir>/test/application/_testing-apis/$1',
   },
   collectCoverageFrom: ['src/domain/**/*.ts', '!src/domain/**/I*.ts'],
   coverageThreshold: {
