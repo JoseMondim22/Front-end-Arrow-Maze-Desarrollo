@@ -42,6 +42,12 @@
     "points": "{{score}} puntos",
     "next": "Siguiente nivel"
   },
+  "leaderboard": {
+    "title": "Ranking",
+    "loading": "Cargando ranking...",
+    "empty": "Todavía no hay puntajes — ¡sé el primero!",
+    "row": "{{position}}. {{username}} — {{score}} pts"
+  },
   "defeat": {
     "title": "Derrota",
     "subtitle": "Ya no quedan movimientos posibles",

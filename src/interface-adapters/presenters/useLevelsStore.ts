@@ -1,10 +1,15 @@
 import { create, StoreApi, UseBoundStore } from 'zustand';
+import { ICommandService } from '../../application/cqs/ICommandService';
 import { IQueryService } from '../../application/cqs/IQueryService';
 import { GetLevelsQuery } from '../../application/use-cases/levels/GetLevelsQuery';
+import { SyncLeaderboardsCommand } from '../../application/use-cases/leaderboard/SyncLeaderboardsCommand';
 import { LoadPlayerProgressQuery } from '../../application/use-cases/progress/LoadPlayerProgressQuery';
 import { Level } from '../../domain/level/Level';
 import { PlayerProgress } from '../../domain/player-progress/PlayerProgress';
 import { LevelOrder } from '../../domain/shared/value-objects/LevelOrder';
+
+// How many leaderboard rows to cache per level for offline reading on Victory.
+const LEADERBOARD_SYNC_LIMIT = 10;
 
 export interface LevelsStoreState {
   levels: Level[];
@@ -18,6 +23,7 @@ export interface LevelsStoreState {
 export interface LevelsStoreDependencies {
   getLevelsUseCase: IQueryService<GetLevelsQuery, Level[]>;
   loadPlayerProgressUseCase: IQueryService<LoadPlayerProgressQuery, PlayerProgress>;
+  syncLeaderboardsUseCase: ICommandService<SyncLeaderboardsCommand>;
 }
 
 /**
@@ -41,6 +47,13 @@ export function createLevelsStore(
           deps.loadPlayerProgressUseCase.execute({}),
         ]);
         set({ levels, progress, isLoading: false });
+        // Not awaited: downloading every level's leaderboard must not block
+        // LevelSelect from showing, and the use case already resolves cleanly
+        // (best-effort per level) even fully offline.
+        void deps.syncLeaderboardsUseCase.execute({
+          levelIds: levels.map((level) => level.id),
+          limit: LEADERBOARD_SYNC_LIMIT,
+        });
       } catch (error) {
         set({ isLoading: false, error: (error as Error).message });
       }

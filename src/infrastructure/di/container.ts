@@ -13,6 +13,7 @@ import { HttpLeaderboardRepository } from '../../interface-adapters/repositories
 import { HttpLevelRepository } from '../../interface-adapters/repositories/HttpLevelRepository';
 import { HttpProgressSyncAdapter } from '../../interface-adapters/repositories/HttpProgressSyncAdapter';
 import { SqlitePlayerProgressRepository } from '../../interface-adapters/repositories/SqlitePlayerProgressRepository';
+import { SqliteLeaderboardRepository } from '../../interface-adapters/repositories/SqliteLeaderboardRepository';
 
 import { RegisterUserUseCase } from '../../application/use-cases/auth/RegisterUserUseCase';
 import { LoginUseCase } from '../../application/use-cases/auth/LoginUseCase';
@@ -22,6 +23,7 @@ import { CompleteLevelUseCase } from '../../application/use-cases/progress/Compl
 import { SyncProgressUseCase } from '../../application/use-cases/progress/SyncProgressUseCase';
 import { LoadPlayerProgressUseCase } from '../../application/use-cases/progress/LoadPlayerProgressUseCase';
 import { GetLeaderboardUseCase } from '../../application/use-cases/leaderboard/GetLeaderboardUseCase';
+import { SyncLeaderboardsUseCase } from '../../application/use-cases/leaderboard/SyncLeaderboardsUseCase';
 
 import { FailedMovesScoringStrategy } from '../../domain/shared/services/FailedMovesScoringStrategy';
 
@@ -29,7 +31,7 @@ import { ExpoAudioService } from '../audio/ExpoAudioService';
 import { HttpClient } from '../http/HttpClient';
 import { I18nLocalizationService } from '../i18n/I18nLocalizationService';
 import { SecureTokenStore } from '../persistence/SecureTokenStore';
-import { SqlitePlayerProgressStore } from '../persistence/sqlite';
+import { SqlitePlayerProgressStore, SqliteLeaderboardStore } from '../persistence/sqlite';
 import { SystemTimeProvider } from '../time/SystemTimeProvider';
 import { ConsoleLogger } from '../logging/ConsoleLogger';
 
@@ -47,6 +49,7 @@ import { ConsoleLogger } from '../logging/ConsoleLogger';
 const tokenStore = new SecureTokenStore();
 const httpClient = new HttpClient(tokenStore);
 const playerProgressStore = new SqlitePlayerProgressStore();
+const leaderboardStore = new SqliteLeaderboardStore();
 const timeProvider = new SystemTimeProvider();
 const logger = new ConsoleLogger();
 
@@ -55,8 +58,13 @@ const logger = new ConsoleLogger();
 const levelRepository = new HttpLevelRepository(httpClient);
 const authRepository = new HttpAuthRepository(httpClient);
 const progressSyncPort = new HttpProgressSyncAdapter(httpClient);
-const leaderboardRepository = new HttpLeaderboardRepository(httpClient);
+// Remote source of truth for leaderboards, now only consumed by
+// SyncLeaderboardsUseCase (§ offline-first decision below).
+const remoteLeaderboardRepository = new HttpLeaderboardRepository(httpClient);
 const playerProgressRepository = new SqlitePlayerProgressRepository(playerProgressStore);
+// Local read (GetLeaderboardUseCase) + write (SyncLeaderboardsUseCase) target —
+// works offline, mirroring how playerProgressRepository is local-first.
+const localLeaderboardRepository = new SqliteLeaderboardRepository(leaderboardStore);
 
 // --- Capa 1: scoring policy, chosen once for the whole app ------------------
 
@@ -76,7 +84,11 @@ const syncProgressUseCase = new SyncProgressUseCase(progressSyncPort);
 const loadPlayerProgressUseCase = new LoadPlayerProgressUseCase(
   playerProgressRepository,
 );
-const getLeaderboardUseCase = new GetLeaderboardUseCase(leaderboardRepository);
+const getLeaderboardUseCase = new GetLeaderboardUseCase(localLeaderboardRepository);
+const syncLeaderboardsUseCase = new SyncLeaderboardsUseCase(
+  remoteLeaderboardRepository,
+  localLeaderboardRepository,
+);
 
 // --- AOP: decorate per §9 ----------------------------------------------
 
@@ -93,7 +105,6 @@ const decoratedLoginUseCase = new LoggingQueryDecorator(
   timeProvider,
   'LoginUseCase',
 );
-
 // Protected (§14: Auth ✅) — AuthGuard outermost, Logging next, Performance/
 // Caching innermost, right next to the real use case.
 const decoratedGetLevelsUseCase = new AuthGuardQueryDecorator(
@@ -161,6 +172,16 @@ const decoratedGetLeaderboardUseCase = new AuthGuardQueryDecorator(
   tokenStore,
 );
 
+const decoratedSyncLeaderboardsUseCase = new AuthGuardCommandDecorator(
+  new LoggingCommandDecorator(
+    syncLeaderboardsUseCase,
+    logger,
+    timeProvider,
+    'SyncLeaderboardsUseCase',
+  ),
+  tokenStore,
+);
+
 // Consumed directly by UI/audio code, not through any use case (§4). Instantiated
 // here (before the presenters) because useGameStore now also depends on it to
 // play sound effects on game events (§4: "the store... republishes to UI and audio").
@@ -186,6 +207,7 @@ export const useGameStore = createGameStore({
 export const useLevelsStore = createLevelsStore({
   getLevelsUseCase: decoratedGetLevelsUseCase,
   loadPlayerProgressUseCase: decoratedLoadPlayerProgressUseCase,
+  syncLeaderboardsUseCase: decoratedSyncLeaderboardsUseCase,
 });
 
 export const useAuthStore = createAuthStore({

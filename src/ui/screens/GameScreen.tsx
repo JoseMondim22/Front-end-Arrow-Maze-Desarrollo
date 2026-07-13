@@ -51,7 +51,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       return;
     }
     if (session.status.name === 'Victory' && session.finalScore !== null) {
-      navigation.replace('Victory', { score: session.finalScore.points });
+      navigation.replace('Victory', { score: session.finalScore.points, level });
     } else if (session.status.name === 'Defeat') {
       navigation.replace('Defeat', { level });
     }

@@ -24,7 +24,7 @@ export type RootStackParamList = {
   Home: undefined;
   LevelSelect: undefined;
   Game: { level: Level };
-  Victory: { score: number };
+  Victory: { score: number; level: Level };
   Defeat: { level: Level };
   Settings: undefined;
 };

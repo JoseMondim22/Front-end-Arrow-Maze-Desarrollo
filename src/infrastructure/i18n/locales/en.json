@@ -42,6 +42,12 @@
     "points": "{{score}} points",
     "next": "Next level"
   },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "loading": "Loading leaderboard...",
+    "empty": "No scores yet — be the first!",
+    "row": "{{position}}. {{username}} — {{score}} pts"
+  },
   "defeat": {
     "title": "Defeat",
     "subtitle": "No more legal moves left",
