@@ -10,10 +10,12 @@ interface Props {
 
 // 'grid_arrow' never reaches runtime terrain — BoardBuilder always projects an
 // arrow seed to plain empty floor (§6.2) before a Board exists to render.
+// The exit tile is deliberately not visually distinguished from empty floor —
+// it should be invisible to the player, not called out in green.
 const TERRAIN_COLOR: Record<CellTypeId, string> = {
   wall: colors.wall,
   empty: colors.empty,
-  exit: colors.exit,
+  exit: colors.empty,
   grid_arrow: colors.empty,
 };
 
