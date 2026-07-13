@@ -1,0 +1,10 @@
+{
+  "app": {
+    "name": "Arrow Maze"
+  },
+  "common": {
+    "play": "Play",
+    "settings": "Settings",
+    "retry": "Retry"
+  }
+}
