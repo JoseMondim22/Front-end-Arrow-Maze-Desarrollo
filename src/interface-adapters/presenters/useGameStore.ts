@@ -20,6 +20,7 @@ export interface GameStoreState {
   moveArrow(chainId: ChainId): void;
   rotateArrow(chainId: ChainId): void;
   undo(): void;
+  tick(elapsedSeconds: number): void;
 }
 
 export interface GameStoreDependencies {
@@ -101,6 +102,13 @@ export function createGameStore(
         return;
       }
       set({ session: invoker.undo() });
+    },
+
+    tick(elapsedSeconds) {
+      if (invoker === null) {
+        return;
+      }
+      set({ session: invoker.tick(elapsedSeconds) });
     },
   }));
 }

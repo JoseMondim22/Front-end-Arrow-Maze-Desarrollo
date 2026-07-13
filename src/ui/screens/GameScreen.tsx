@@ -20,10 +20,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const startGame = useGameStore((state) => state.startGame);
   const moveArrow = useGameStore((state) => state.moveArrow);
   const rotateArrow = useGameStore((state) => state.rotateArrow);
+  const tick = useGameStore((state) => state.tick);
 
   useEffect(() => {
     void startGame(level);
   }, [level, startGame]);
+
+  // GameSession.tick() no-ops once the session leaves Playing (§6.5), so this can
+  // run unconditionally; the interval is cleared the moment the screen unmounts,
+  // which happens right away on the Victory/Defeat replace below.
+  useEffect(() => {
+    const interval = setInterval(() => tick(1), 1000);
+    return () => clearInterval(interval);
+  }, [tick]);
 
   useEffect(() => {
     if (session === null) {
@@ -58,6 +67,8 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         movesUsed={session.movesUsed}
         maxMoves={level.rules.maxMoves}
         activeChainCount={session.activeChainCount}
+        timeUsedSeconds={session.timeUsed}
+        timeLimitSeconds={level.rules.timeLimit}
       />
       <BoardView
         view={session.view}

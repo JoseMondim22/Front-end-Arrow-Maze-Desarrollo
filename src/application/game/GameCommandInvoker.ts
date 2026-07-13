@@ -41,4 +41,14 @@ export class GameCommandInvoker {
     }
     return this.current;
   }
+
+  /**
+   * Advance the clock. Deliberately bypasses execute()/history: a tick is not a
+   * player action, so it must never become an undo point — undo should always
+   * rewind the last MOVE, not eat a second of elapsed time instead.
+   */
+  tick(elapsedSeconds: number): GameSession {
+    this.current = this.current.tick(elapsedSeconds);
+    return this.current;
+  }
 }

@@ -58,4 +58,28 @@ describe('GameCommandInvoker', () => {
     expect(invoker.session).toBe(session);
     expect(invoker.canUndo()).toBe(false);
   });
+
+  it('should_advance_time_without_creating_an_undo_point', () => {
+    const session = GameSessionMother.playingWithClearPathToExit();
+    const invoker = new GameCommandInvoker(session);
+
+    invoker.tick(10);
+
+    expect(invoker.session.timeUsed).toBe(10);
+    // A tick must never become something undo can rewind through.
+    expect(invoker.canUndo()).toBe(false);
+  });
+
+  it('should_still_undo_the_last_move_after_ticking', () => {
+    const session = GameSessionMother.withHeadFacingWall();
+    const invoker = new GameCommandInvoker(session);
+    invoker.tick(5);
+    invoker.execute(new MoveArrowCommand(ChainId.of('c1')));
+
+    invoker.undo();
+
+    expect(invoker.session.movesUsed).toBe(0);
+    // The tick that happened before the move is not lost by the undo.
+    expect(invoker.session.timeUsed).toBe(5);
+  });
 });
