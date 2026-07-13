@@ -11,7 +11,10 @@
     "baseUrl": ".",
     "paths": {
       "@domain/*": ["src/domain/*"],
-      "@mothers/*": ["test/domain/_mothers/*"]
+      "@mothers/*": ["test/domain/_mothers/*"],
+      "@application/*": ["src/application/*"],
+      "@app-mothers/*": ["test/application/_mothers/*"],
+      "@testing-apis/*": ["test/application/_testing-apis/*"]
     }
   },
   "include": ["src", "test"]
