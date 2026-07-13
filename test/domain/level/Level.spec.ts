@@ -4,20 +4,11 @@ import { Score } from '@domain/shared/value-objects/Score';
 import { LevelMother } from '@mothers/LevelMother';
 
 describe('Level', () => {
-  it('should_create_level_with_given_identity_and_order', () => {
+  it('should_reconstitute_level_with_given_identity_and_order', () => {
     const level = LevelMother.atOrder(3);
 
     expect(level.id.equals(LevelId.of('lvl-1'))).toBe(true);
     expect(level.order.sequence).toBe(3);
-  });
-
-  it('should_reconstitute_equivalently_to_create', () => {
-    const created = LevelMother.aLevel();
-    const reconstituted = LevelMother.reconstituted();
-
-    expect(reconstituted.id.equals(created.id)).toBe(true);
-    expect(reconstituted.rules.maxPossibleScore).toBe(created.rules.maxPossibleScore);
-    expect(reconstituted.order.sequence).toBe(created.order.sequence);
   });
 
   it('should_consider_score_plausible_when_at_ceiling', () => {
