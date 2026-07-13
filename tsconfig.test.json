@@ -17,5 +17,9 @@
       "@testing-apis/*": ["test/application/_testing-apis/*"]
     }
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  "exclude": [
+    "src/ui",
+    "src/infrastructure"
+  ]
 }
