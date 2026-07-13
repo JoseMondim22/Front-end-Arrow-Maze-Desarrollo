@@ -61,14 +61,21 @@ export function createAuthStore(
     },
 
     async restoreSession() {
-      const hasSession = await deps.tokenStore.hasActiveSession();
-      if (!hasSession) {
-        return;
-      }
-      const accessToken = await deps.tokenStore.getAccessToken();
-      const userId = await deps.tokenStore.getUserId();
-      if (accessToken !== null && userId !== null) {
-        set({ session: { accessToken, userId } });
+      // Checking for a persisted session must never block app boot: if the
+      // platform's secure store is unavailable for any reason, fall back to
+      // "not logged in" instead of crashing the startup gate.
+      try {
+        const hasSession = await deps.tokenStore.hasActiveSession();
+        if (!hasSession) {
+          return;
+        }
+        const accessToken = await deps.tokenStore.getAccessToken();
+        const userId = await deps.tokenStore.getUserId();
+        if (accessToken !== null && userId !== null) {
+          set({ session: { accessToken, userId } });
+        }
+      } catch {
+        // Treated as "no session" — see comment above.
       }
     },
   }));
