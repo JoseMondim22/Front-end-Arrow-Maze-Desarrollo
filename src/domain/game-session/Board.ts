@@ -3,8 +3,11 @@ import { CellType } from '../shared/board/cells/CellType';
 import { DomainError } from '../shared/errors/DomainError';
 import { ChainId } from '../shared/value-objects/ChainId';
 import { Direction } from '../shared/value-objects/Direction';
+import { GridPosition } from '../shared/value-objects/GridPosition';
 import { NodeId } from '../shared/value-objects/NodeId';
+import { Position } from '../shared/value-objects/Position';
 import { ArrowChain } from './ArrowChain';
+import { BoardView, CellView, ChainView } from './BoardView';
 
 /**
  * Directional neighbours of a node, precomputed once by BoardBuilder from the grid
@@ -36,6 +39,7 @@ export type SlideOutcome = 'Exited' | 'Reverted';
 export class Board {
   private constructor(
     private readonly terrain: ReadonlyMap<string, CellType>,
+    private readonly positions: ReadonlyMap<string, Position>,
     private readonly adjacency: ReadonlyMap<string, DirectionalAdjacency>,
     private readonly activeChains: readonly ArrowChain[],
   ) {}
@@ -46,14 +50,48 @@ export class Board {
     chains: readonly ArrowChain[];
   }): Board {
     const terrain = new Map<string, CellType>();
+    const positions = new Map<string, Position>();
     for (const node of params.nodes) {
       terrain.set(node.id.toString(), node.terrain);
+      positions.set(node.id.toString(), node.at);
     }
-    return new Board(terrain, params.adjacency, [...params.chains]);
+    return new Board(terrain, positions, params.adjacency, [...params.chains]);
   }
 
   get chains(): readonly ArrowChain[] {
     return this.activeChains;
+  }
+
+  /**
+   * Read-only render snapshot (§6.5 GameSession.view). Positions are ONLY used here
+   * — this is the one place in the domain allowed to require a concrete GridPosition,
+   * because a BoardView exists purely to be painted, never to resolve a rule.
+   */
+  toView(): BoardView {
+    const cells = [...this.terrain.entries()].map(
+      ([id, terrain]) =>
+        new CellView(NodeId.of(id), this.gridPositionAt(id), terrain.id),
+    );
+    const chains = this.activeChains.map(
+      (chain) =>
+        new ChainView(
+          chain.id,
+          chain.nodeIds.map((nodeId) => this.gridPositionAt(nodeId.toString())),
+          chain.direction,
+        ),
+    );
+    return new BoardView(cells, chains);
+  }
+
+  private gridPositionAt(nodeKey: string): GridPosition {
+    const position = this.positions.get(nodeKey);
+    if (position === undefined) {
+      throw new DomainError(`No position for node: ${nodeKey}`);
+    }
+    if (!(position instanceof GridPosition)) {
+      throw new DomainError(`Node ${nodeKey} needs a GridPosition to render`);
+    }
+    return position;
   }
 
   /** Is any chain standing on this node right now? */
@@ -90,7 +128,7 @@ export class Board {
       if (cell.id === 'exit') {
         const remaining = this.activeChains.filter((c) => !c.id.equals(chainId));
         return {
-          board: new Board(this.terrain, this.adjacency, remaining),
+          board: new Board(this.terrain, this.positions, this.adjacency, remaining),
           outcome: 'Exited',
         };
       }
@@ -118,7 +156,7 @@ export class Board {
     const rotated = this.activeChains.map((chain) =>
       chain.id.equals(chainId) ? chain.rotate() : chain,
     );
-    return new Board(this.terrain, this.adjacency, rotated);
+    return new Board(this.terrain, this.positions, this.adjacency, rotated);
   }
 
   /**

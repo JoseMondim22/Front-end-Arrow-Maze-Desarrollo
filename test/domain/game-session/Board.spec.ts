@@ -88,4 +88,44 @@ describe('Board', () => {
     expect(chainA?.direction.id).toBe('down'); // Right rotated clockwise
     expect(chainB?.direction.id).toBe('right'); // untouched
   });
+
+  it('should_expose_every_node_position_and_terrain_kind_in_the_render_view', () => {
+    const board = BoardMother.straightPathToExit();
+
+    const view = board.toView();
+    const byId = new Map(view.cells.map((cell) => [cell.nodeId.toString(), cell]));
+
+    expect(view.cells).toHaveLength(3);
+    // n1 is a grid_arrow seed in the definition, projected to empty floor (§6.2).
+    expect(byId.get('n0')?.terrain).toBe('empty');
+    expect(byId.get('n1')?.terrain).toBe('empty');
+    expect(byId.get('exit')?.terrain).toBe('exit');
+    expect(byId.get('n0')?.position.rowIndex).toBe(0);
+    expect(byId.get('n0')?.position.columnIndex).toBe(0);
+    expect(byId.get('n1')?.position.columnIndex).toBe(1);
+  });
+
+  it('should_expose_chain_segments_tail_to_head_with_the_current_direction', () => {
+    const board = BoardMother.straightPathToExit();
+
+    const view = board.toView();
+
+    expect(view.chains).toHaveLength(1);
+    const chainView = view.chains[0];
+    expect(chainView.chainId.equals(ChainId.of('c1'))).toBe(true);
+    expect(chainView.headDirection.id).toBe('right');
+    expect(chainView.segments.map((p) => [p.rowIndex, p.columnIndex])).toEqual([
+      [0, 0],
+      [0, 1],
+    ]);
+    expect(chainView.headPosition.columnIndex).toBe(1);
+  });
+
+  it('should_drop_exited_chains_from_the_render_view', () => {
+    const board = BoardMother.straightPathToExit();
+
+    const { board: afterExit } = board.slideChain(ChainId.of('c1'));
+
+    expect(afterExit.toView().chains).toHaveLength(0);
+  });
 });
