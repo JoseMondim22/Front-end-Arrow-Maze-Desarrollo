@@ -5,6 +5,7 @@ import { AuthSession, ITokenStore } from '../../application/ports/ITokenStore';
 import { LoginResult } from '../../application/ports/IAuthRepository';
 import { LoginQuery } from '../../application/use-cases/auth/LoginQuery';
 import { RegisterUserCommand } from '../../application/use-cases/auth/RegisterUserCommand';
+import { ClearLocalProgressCommand } from '../../application/use-cases/progress/ClearLocalProgressCommand';
 
 export interface AuthStoreState {
   session: AuthSession | null;
@@ -19,6 +20,7 @@ export interface AuthStoreState {
 export interface AuthStoreDependencies {
   registerUserUseCase: ICommandService<RegisterUserCommand>;
   loginUseCase: IQueryService<LoginQuery, LoginResult>;
+  clearLocalProgressUseCase: ICommandService<ClearLocalProgressCommand>;
   tokenStore: ITokenStore;
 }
 
@@ -57,6 +59,10 @@ export function createAuthStore(
 
     async logout() {
       await deps.tokenStore.clearSession();
+      // Local progress has no per-account scoping (§15) — wipe it here so the
+      // next account to log in on this device never sees a leftover user's
+      // progress (see ClearLocalProgressUseCase).
+      await deps.clearLocalProgressUseCase.execute({});
       set({ session: null });
     },
 

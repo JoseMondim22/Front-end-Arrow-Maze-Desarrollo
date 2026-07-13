@@ -22,6 +22,7 @@ import { StartGameUseCase } from '../../application/use-cases/levels/StartGameUs
 import { CompleteLevelUseCase } from '../../application/use-cases/progress/CompleteLevelUseCase';
 import { SyncProgressUseCase } from '../../application/use-cases/progress/SyncProgressUseCase';
 import { LoadPlayerProgressUseCase } from '../../application/use-cases/progress/LoadPlayerProgressUseCase';
+import { ClearLocalProgressUseCase } from '../../application/use-cases/progress/ClearLocalProgressUseCase';
 import { GetLeaderboardUseCase } from '../../application/use-cases/leaderboard/GetLeaderboardUseCase';
 import { SyncLeaderboardsUseCase } from '../../application/use-cases/leaderboard/SyncLeaderboardsUseCase';
 
@@ -84,6 +85,7 @@ const syncProgressUseCase = new SyncProgressUseCase(progressSyncPort);
 const loadPlayerProgressUseCase = new LoadPlayerProgressUseCase(
   playerProgressRepository,
 );
+const clearLocalProgressUseCase = new ClearLocalProgressUseCase(playerProgressRepository);
 const getLeaderboardUseCase = new GetLeaderboardUseCase(localLeaderboardRepository);
 const syncLeaderboardsUseCase = new SyncLeaderboardsUseCase(
   remoteLeaderboardRepository,
@@ -105,6 +107,15 @@ const decoratedLoginUseCase = new LoggingQueryDecorator(
   timeProvider,
   'LoginUseCase',
 );
+// No AuthGuard: this is a purely local reset run from logout(), which may run
+// after the session is already gone — it doesn't call the backend at all.
+const decoratedClearLocalProgressUseCase = new LoggingCommandDecorator(
+  clearLocalProgressUseCase,
+  logger,
+  timeProvider,
+  'ClearLocalProgressUseCase',
+);
+
 // Protected (§14: Auth ✅) — AuthGuard outermost, Logging next, Performance/
 // Caching innermost, right next to the real use case.
 const decoratedGetLevelsUseCase = new AuthGuardQueryDecorator(
@@ -213,6 +224,7 @@ export const useLevelsStore = createLevelsStore({
 export const useAuthStore = createAuthStore({
   registerUserUseCase: decoratedRegisterUserUseCase,
   loginUseCase: decoratedLoginUseCase,
+  clearLocalProgressUseCase: decoratedClearLocalProgressUseCase,
   tokenStore,
 });
 
