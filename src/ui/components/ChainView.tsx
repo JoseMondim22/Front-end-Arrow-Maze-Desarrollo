@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { GridPosition } from '../../domain/shared/value-objects/GridPosition';
 import type { ChainView as ChainViewModel } from '../../domain/game-session/BoardView';
-import { colors, radii } from '../theme';
+import { chainPalette, colors } from '../theme';
 
 interface Props {
   chain: ChainViewModel;
@@ -60,6 +60,14 @@ function directionDelta(directionId: string): { x: number; y: number } {
 
 function pixelsOf(position: GridPosition, cellSize: number): { x: number; y: number } {
   return { x: position.columnIndex * cellSize, y: position.rowIndex * cellSize };
+}
+
+/** Picks once, on mount, and keeps it for the component's lifetime — BoardView
+ * keys each ChainView by chainId, so this stays stable across re-renders and
+ * only re-rolls if the chain itself unmounts and a new one takes its place. */
+function useRandomChainColor(): string {
+  const colorRef = useRef(chainPalette[Math.floor(Math.random() * chainPalette.length)]);
+  return colorRef.current;
 }
 
 /** Animates each segment's ValueXY toward its new pixel position whenever the
@@ -214,6 +222,7 @@ export function ChainView({
   const pendingMove = useRef<ReturnType<typeof setTimeout> | null>(null);
   const segmentAnimations = useSegmentAnimations(chain.segments, cellSize);
   const rotationDegrees = useHeadRotationAnimation(chain.headDirection.id);
+  const chainColor = useRandomChainColor();
 
   useExitAnimation({
     isExiting,
@@ -272,7 +281,7 @@ export function ChainView({
               disabled={isExiting}
               style={styles.touchArea}
             >
-              <View style={styles.body}>
+              <View style={[styles.body, { backgroundColor: chainColor }]}>
                 {isHead && (
                   <Animated.Text
                     style={[
@@ -306,15 +315,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
-    padding: 3,
   },
   touchArea: {
     flex: 1,
   },
   body: {
     flex: 1,
-    backgroundColor: colors.chain,
-    borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
