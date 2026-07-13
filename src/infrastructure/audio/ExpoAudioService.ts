@@ -1,8 +1,8 @@
-import { Audio, AVPlaybackSource } from 'expo-av';
+import { createAudioPlayer, AudioSource, AudioStatus } from 'expo-audio';
 import { IAudioService } from '../../application/ports/IAudioService';
 
 /**
- * Concrete IAudioService (Singleton, §11) backed by expo-av. Sound sources are
+ * Concrete IAudioService (Singleton, §11) backed by expo-audio. Sound sources are
  * injected by id -> asset map at construction time, since no bundled sound files
  * exist yet; wire the real assets here once they're added under assets/sounds/.
  */
@@ -11,9 +11,9 @@ export class ExpoAudioService implements IAudioService {
 
   private muted = false;
 
-  private constructor(private readonly sources: Record<string, AVPlaybackSource>) {}
+  private constructor(private readonly sources: Record<string, AudioSource>) {}
 
-  static getInstance(sources: Record<string, AVPlaybackSource>): ExpoAudioService {
+  static getInstance(sources: Record<string, AudioSource>): ExpoAudioService {
     if (ExpoAudioService.instance === null) {
       ExpoAudioService.instance = new ExpoAudioService(sources);
     }
@@ -28,13 +28,13 @@ export class ExpoAudioService implements IAudioService {
     if (source === undefined) {
       return;
     }
-    const { sound } = await Audio.Sound.createAsync(source);
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) {
-        void sound.unloadAsync();
+    const player = createAudioPlayer(source);
+    player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
+      if (status.didJustFinish) {
+        player.remove();
       }
     });
-    await sound.playAsync();
+    player.play();
   }
 
   async setMuted(muted: boolean): Promise<void> {

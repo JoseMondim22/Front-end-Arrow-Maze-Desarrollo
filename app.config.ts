@@ -17,6 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
   },
   android: {
+    package: 'com.josemondim.arrowmaze',
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/android-icon-foreground.png',
@@ -28,8 +29,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     favicon: './assets/favicon.png',
   },
-  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-localization'],
+  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-localization', 'expo-audio'],
   extra: {
     apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:3000',
+    eas: {
+      projectId: '8ed3700e-bda9-44c6-b686-c2c431b34da9',
+    },
   },
 });
