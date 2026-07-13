@@ -15,7 +15,7 @@ export class LevelMother {
   }
 
   static aLevel(): Level {
-    return Level.create(
+    return Level.reconstitute(
       LevelId.of('lvl-1'),
       BoardMother.straightPathToExitDefinition(),
       LevelMother.rules(),
@@ -24,7 +24,7 @@ export class LevelMother {
   }
 
   static withMaxScore(maxPossibleScore: number): Level {
-    return Level.create(
+    return Level.reconstitute(
       LevelId.of('lvl-1'),
       BoardMother.straightPathToExitDefinition(),
       LevelMother.rules(maxPossibleScore),
@@ -33,20 +33,11 @@ export class LevelMother {
   }
 
   static atOrder(order: number): Level {
-    return Level.create(
-      LevelId.of('lvl-1'),
-      BoardMother.straightPathToExitDefinition(),
-      LevelMother.rules(),
-      LevelOrder.of(order),
-    );
-  }
-
-  static reconstituted(): Level {
     return Level.reconstitute(
       LevelId.of('lvl-1'),
       BoardMother.straightPathToExitDefinition(),
       LevelMother.rules(),
-      LevelOrder.of(1),
+      LevelOrder.of(order),
     );
   }
 }

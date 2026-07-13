@@ -10,9 +10,10 @@ import { BoardDefinition } from './value-objects/BoardDefinition';
 /**
  * Aggregate root: the static definition of a playable level.
  *
- * Constructed only through named factories (private constructor, aligned with the
- * backend aggregate): create() for a brand-new level authored in the client's level
- * editor, reconstitute() for a level rehydrated from the backend via LevelMapper.
+ * Constructed only through a named factory (private constructor, aligned with the
+ * backend aggregate): reconstitute() rehydrates a level from the backend via
+ * LevelMapper. There is no create() — the client has no level editor, so a Level
+ * always arrives already defined by the backend.
  *
  * It carries real behaviour, not just getters: isScorePlausible guards against a
  * score above the level's ceiling before it is ever recorded or synced.
@@ -27,16 +28,6 @@ export class Level {
     private readonly levelRules: LevelRules,
     private readonly levelOrder: LevelOrder,
   ) {}
-
-  /** A brand-new level authored in the client (level editor, POST /levels). */
-  static create(
-    id: LevelId,
-    board: BoardDefinition,
-    rules: LevelRules,
-    order: LevelOrder,
-  ): Level {
-    return new Level(id, board, rules, order);
-  }
 
   /** A level rehydrated from the backend (via LevelMapper.toDomain). */
   static reconstitute(
