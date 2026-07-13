@@ -1,7 +1,7 @@
 import { create, StoreApi, UseBoundStore } from 'zustand';
+import { IQueryService } from '../../application/cqs/IQueryService';
 import { LeaderboardEntryResult } from '../../application/ports/ILeaderboardRepository';
 import { GetLeaderboardQuery } from '../../application/use-cases/leaderboard/GetLeaderboardQuery';
-import { GetLeaderboardUseCase } from '../../application/use-cases/leaderboard/GetLeaderboardUseCase';
 
 export interface LeaderboardStoreState {
   entries: LeaderboardEntryResult[];
@@ -11,7 +11,7 @@ export interface LeaderboardStoreState {
 }
 
 export interface LeaderboardStoreDependencies {
-  getLeaderboardUseCase: GetLeaderboardUseCase;
+  getLeaderboardUseCase: IQueryService<GetLeaderboardQuery, LeaderboardEntryResult[]>;
 }
 
 /** Presenter for the leaderboard screen. Pure delegation to GetLeaderboardUseCase. */

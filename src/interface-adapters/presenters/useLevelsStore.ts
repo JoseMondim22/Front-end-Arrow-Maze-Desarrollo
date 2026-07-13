@@ -1,6 +1,7 @@
 import { create, StoreApi, UseBoundStore } from 'zustand';
-import { GetLevelsUseCase } from '../../application/use-cases/levels/GetLevelsUseCase';
-import { LoadPlayerProgressUseCase } from '../../application/use-cases/progress/LoadPlayerProgressUseCase';
+import { IQueryService } from '../../application/cqs/IQueryService';
+import { GetLevelsQuery } from '../../application/use-cases/levels/GetLevelsQuery';
+import { LoadPlayerProgressQuery } from '../../application/use-cases/progress/LoadPlayerProgressQuery';
 import { Level } from '../../domain/level/Level';
 import { PlayerProgress } from '../../domain/player-progress/PlayerProgress';
 import { LevelOrder } from '../../domain/shared/value-objects/LevelOrder';
@@ -15,8 +16,8 @@ export interface LevelsStoreState {
 }
 
 export interface LevelsStoreDependencies {
-  getLevelsUseCase: GetLevelsUseCase;
-  loadPlayerProgressUseCase: LoadPlayerProgressUseCase;
+  getLevelsUseCase: IQueryService<GetLevelsQuery, Level[]>;
+  loadPlayerProgressUseCase: IQueryService<LoadPlayerProgressQuery, PlayerProgress>;
 }
 
 /**

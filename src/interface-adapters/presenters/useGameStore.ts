@@ -1,9 +1,11 @@
 import { create, StoreApi, UseBoundStore } from 'zustand';
+import { ICommandService } from '../../application/cqs/ICommandService';
+import { IQueryService } from '../../application/cqs/IQueryService';
 import { GameCommandInvoker } from '../../application/game/GameCommandInvoker';
 import { MoveArrowCommand } from '../../application/game/MoveArrowCommand';
 import { RotateArrowCommand } from '../../application/game/RotateArrowCommand';
-import { CompleteLevelUseCase } from '../../application/use-cases/progress/CompleteLevelUseCase';
-import { StartGameUseCase } from '../../application/use-cases/levels/StartGameUseCase';
+import { CompleteLevelCommand } from '../../application/use-cases/progress/CompleteLevelCommand';
+import { StartGameQuery } from '../../application/use-cases/levels/StartGameQuery';
 import { GameSession } from '../../domain/game-session/GameSession';
 import { Level } from '../../domain/level/Level';
 import { ChainId } from '../../domain/shared/value-objects/ChainId';
@@ -21,8 +23,8 @@ export interface GameStoreState {
 }
 
 export interface GameStoreDependencies {
-  startGameUseCase: StartGameUseCase;
-  completeLevelUseCase: CompleteLevelUseCase;
+  startGameUseCase: IQueryService<StartGameQuery, GameSession>;
+  completeLevelUseCase: ICommandService<CompleteLevelCommand>;
 }
 
 /**

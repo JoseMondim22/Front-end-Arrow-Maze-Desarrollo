@@ -1,9 +1,10 @@
 import { create, StoreApi, UseBoundStore } from 'zustand';
+import { ICommandService } from '../../application/cqs/ICommandService';
+import { IQueryService } from '../../application/cqs/IQueryService';
 import { AuthSession, ITokenStore } from '../../application/ports/ITokenStore';
+import { LoginResult } from '../../application/ports/IAuthRepository';
 import { LoginQuery } from '../../application/use-cases/auth/LoginQuery';
-import { LoginUseCase } from '../../application/use-cases/auth/LoginUseCase';
 import { RegisterUserCommand } from '../../application/use-cases/auth/RegisterUserCommand';
-import { RegisterUserUseCase } from '../../application/use-cases/auth/RegisterUserUseCase';
 
 export interface AuthStoreState {
   session: AuthSession | null;
@@ -16,8 +17,8 @@ export interface AuthStoreState {
 }
 
 export interface AuthStoreDependencies {
-  registerUserUseCase: RegisterUserUseCase;
-  loginUseCase: LoginUseCase;
+  registerUserUseCase: ICommandService<RegisterUserCommand>;
+  loginUseCase: IQueryService<LoginQuery, LoginResult>;
   tokenStore: ITokenStore;
 }
 
