@@ -7,27 +7,19 @@ repositorio hermano) solo crea, valida estructuralmente y sirve niveles.
 
 El proyecto sigue **Clean Architecture** (4 capas) + **SOLID** + patrones **GoF** + **AOP vía
 Decorator** + **DDD táctico con agregados**. La guía completa de arquitectura vive en
-[`CLAUDE.md`](./CLAUDE.md) — este README resume lo esencial y documenta el **diagrama de
-clases real** del código, no el aspiracional.
+[`CLAUDE.md`](./CLAUDE.md) — este README documenta específicamente SOLID, los patrones GoF y
+el AOP, con ejemplos de código reales.
 
 ---
 
 ## Tabla de contenidos
 
 - [Stack tecnológico](#stack-tecnológico)
-- [Arquitectura](#arquitectura)
-  - [Diagrama de capas (Clean Architecture)](#diagrama-de-capas-clean-architecture)
-- [Estructura de carpetas](#estructura-de-carpetas)
-- [Diagrama de clases](#diagrama-de-clases)
-  - [1. Dominio — agregados](#1-dominio--agregados-gamesession-level-playerprogress)
-  - [2. Dominio — kernel compartido](#2-dominio--kernel-compartido-cells-value-objects-scoring-events)
-  - [3. Aplicación — casos de uso y CQS](#3-aplicación--casos-de-uso-y-cqs)
-  - [4. Adaptadores e infraestructura](#4-adaptadores-e-infraestructura)
-- [AOP — decoradores implementados](#aop--decoradores-implementados)
-- [Reglas del juego](#reglas-del-juego-invariantes-de-gamesession)
-- [Arquitectura de testing](#arquitectura-de-testing)
 - [Cómo correr el proyecto](#cómo-correr-el-proyecto)
-- [Conventional Commits](#conventional-commits)
+- [Diagrama de arquitectura](#diagrama-de-arquitectura)
+- [Principios SOLID](#principios-solid)
+- [Patrones de diseño (GoF)](#patrones-de-diseño-gof)
+- [AOP con SOLID](#aop-con-solid)
 
 ---
 
@@ -48,598 +40,375 @@ clases real** del código, no el aspiracional.
 
 ---
 
-## Arquitectura
+## Cómo correr el proyecto
 
-```
-Frameworks / UI  →  Interface Adapters  →  Application (Use Cases)  →  Domain
-```
+```bash
+npm install
+npx expo start          # desarrollo (Expo Go / dev client)
+npm run android          # abrir directo en emulador/dispositivo Android
+npm run ios              # ídem iOS
+npm run web               # preview web (login/registro solamente — expo-secure-store no soporta web)
 
-- **`domain/`** no importa nada del proyecto — ni Expo, ni Zustand, ni React, ni `fetch`.
-- **`application/`** solo importa `domain/` (casos de uso CQS + patrón Command para las
-  acciones de juego, que no tocan puertos).
-- **`interface-adapters/`** implementa los puertos técnicos y traduce DTO ↔ dominio.
-- **`infrastructure/`** y **`ui/`** cablean todo; **`infrastructure/di/container.ts`** es el
-  único archivo del proyecto que instancia clases concretas (Composition Root).
-
-**AOP** se resuelve con el patrón **Decorator** sobre los puertos CQS
-(`ICommandService`/`IQueryService`), nunca con una librería de AOP: el Composition Root arma
-la cadena `AuthGuard → Logging → Performance/Caching → caso de uso real`.
-
-### Diagrama de capas (Clean Architecture)
-
-Las flechas representan **dependencias de código** (import), no flujo de datos — siempre
-apuntan hacia adentro. `domain/` no depende de nada; todo lo demás depende, directa o
-transitivamente, de `domain/`.
-
-```mermaid
-flowchart TB
-    subgraph L4["Capa 4 — Frameworks & Infrastructure / UI"]
-        direction TB
-        UI["ui/<br/>screens · components · navigation"]
-        INFRA["infrastructure/<br/>http · persistence · audio · i18n · time · logging<br/><b>di/container.ts (Composition Root)</b>"]
-    end
-
-    subgraph L3["Capa 3 — Interface Adapters"]
-        direction TB
-        PRES["presenters/<br/>useAuthStore · useGameStore · useLevelsStore · useLeaderboardStore"]
-        REPO["repositories/<br/>Http*Repository · Sqlite*Repository"]
-        MAP["mappers/<br/>LevelMapper · PlayerProgressMapper · LeaderboardMapper"]
-        DEC["decorators/<br/>Logging · AuthGuard · Performance · Caching (AOP)"]
-        DTO["dtos/<br/>input/ · output/"]
-    end
-
-    subgraph L2["Capa 2 — Application (Use Cases)"]
-        direction TB
-        UC["use-cases/<br/>auth · levels · progress · leaderboard (CQS)"]
-        CMD["game/<br/>GameCommand · MoveArrowCommand · RotateArrowCommand · GameCommandInvoker"]
-        PORTS["ports/<br/>IAuthRepository · ITokenStore · IAudioService · ILogger ..."]
-    end
-
-    subgraph L1["Capa 1 — Domain"]
-        direction TB
-        AGG["Agregados<br/>GameSession · Level · PlayerProgress"]
-        SHARED["shared/<br/>value objects · cells · ScoringStrategy · GameEvent"]
-        DPORTS["Puertos de dominio<br/>ILevelRepository · IPlayerProgressRepository"]
-    end
-
-    L4 -.->|"depende de"| L3
-    L3 -.->|"depende de"| L2
-    L2 -.->|"depende de"| L1
-
-    style L1 fill:#2b2d42,color:#ffffff,stroke:#8d99ae
-    style L2 fill:#3d405b,color:#ffffff,stroke:#8d99ae
-    style L3 fill:#5a5f8d,color:#ffffff,stroke:#8d99ae
-    style L4 fill:#7d83b0,color:#ffffff,stroke:#8d99ae
+npm run typecheck         # tsc --noEmit
+npm test                  # jest
+eas build -p android      # APK de release (ver eas.json)
 ```
 
-> `domain/` **no importa nada** de las capas externas — ni siquiera de `application/`. Los
-> puertos de repositorio (`ILevelRepository`, `IPlayerProgressRepository`) viven **junto al
-> agregado en el dominio** (repository-as-contract, DDD), no en `application/ports/`; solo
-> los puertos técnicos (`IAuthRepository`, `ITokenStore`, `IAudioService`, etc.) están ahí.
-> `infrastructure/di/container.ts` es el único punto del proyecto donde una capa externa
-> conoce clases concretas de las capas internas — el resto siempre depende de interfaces.
+La URL base del backend se configura en `app.config.ts` (`extra.apiBaseUrl`).
 
 ---
 
-## Estructura de carpetas
+## Diagrama de arquitectura
 
-```
-src/
-├─ domain/
-│  ├─ game-session/     # AGREGADO — GameSession (raíz), Board, ArrowChain, GameStatus
-│  ├─ level/             # AGREGADO — Level (raíz), BoardBuilder, CellFactory, ILevelRepository
-│  ├─ player-progress/   # AGREGADO — PlayerProgress (raíz), LevelProgress
-│  └─ shared/             # VOs y piezas usadas por 2+ agregados: cells, value-objects,
-│                          #   services (ScoringStrategy), events (GameEvent), errors
-├─ application/
-│  ├─ cqs/                # ICommandService, IQueryService
-│  ├─ use-cases/          # auth/ levels/ progress/ leaderboard/
-│  ├─ game/                # Patrón Command: GameCommand, MoveArrowCommand,
-│  │                        #   RotateArrowCommand, GameCommandInvoker
-│  └─ ports/                # puertos técnicos (IAuthRepository, ITokenStore, IAudioService...)
-├─ interface-adapters/
-│  ├─ presenters/          # useAuthStore, useGameStore, useLevelsStore, useLeaderboardStore
-│  ├─ repositories/        # Http*, Sqlite*
-│  ├─ mappers/               # LevelMapper, PlayerProgressMapper, LeaderboardMapper
-│  ├─ decorators/            # AOP: Logging / AuthGuard / Performance / Caching
-│  ├─ ports/                  # IHttpClient, IPlayerProgressStore, ILeaderboardStore
-│  └─ dtos/                    # input/ (lo que el cliente manda) · output/ (lo que devuelve el backend)
-├─ infrastructure/
-│  ├─ http/  persistence/  audio/  i18n/  time/  logging/
-│  └─ di/container.ts       # Composition Root
-└─ ui/
-   ├─ screens/  components/  navigation/
-```
+![Arquitectura Clean Architecture — 4 capas](./docs/arquitectura-4-capas.drawio.png)
 
 ---
 
-## Diagrama de clases
+## Principios SOLID
 
-Los diagramas siguientes reflejan el **código real** (`src/`), verificado archivo por
-archivo. Están separados por capa para que cada uno se pueda leer sin cruzar la regla de
-dependencia.
+Los cinco principios están aplicados en el dominio y la capa de aplicación, no solo declarados.
+Cada uno con un ejemplo real del código del proyecto (la aplicación a los decoradores AOP se ve
+en detalle en la sección siguiente).
 
-### 1. Dominio — agregados (`GameSession`, `Level`, `PlayerProgress`)
+### S — Single Responsibility
 
-```mermaid
-classDiagram
-    class GameSession {
-        -state: GameSessionState
-        +status: GameStatus
-        +movesUsed: number
-        +timeUsed: number
-        +failedMoves: number
-        +activeChainCount: number
-        +view: BoardView
-        +finalScore: Score
-        +begin(board, rules, scoring)$ GameSession
-        +pullEvents() GameEvent[]
-        +moveArrow(chainId: ChainId) GameSession
-        +rotateArrow(chainId: ChainId) GameSession
-        +tick(elapsedSeconds: number) GameSession
-        +pause() GameSession
-        +resume() GameSession
-    }
-    class Board {
-        -terrain: Map~string, CellType~
-        -positions: Map~string, Position~
-        -adjacency: Map~string, DirectionalAdjacency~
-        -activeChains: ArrowChain[]
-        +create(nodes, adjacency, chains)$ Board
-        +chains: ArrowChain[]
-        +toView() BoardView
-        +isOccupied(nodeId: NodeId) boolean
-        +slideChain(chainId: ChainId) SlideResult
-        +rotateChain(chainId: ChainId) Board
-        +hasLegalMove(chainId: ChainId) boolean
-    }
-    class ArrowChain {
-        -chainId: ChainId
-        -orderedNodeIds: NodeId[]
-        -headDirection: Direction
-        +create(chainId, nodeIds, direction)$ ArrowChain
-        +id: ChainId
-        +nodeIds: NodeId[]
-        +head: NodeId
-        +tail: NodeId
-        +direction: Direction
-        +rotate() ArrowChain
-        +occupies(nodeId: NodeId) boolean
-    }
-    class IRotatable {
-        <<interface>>
-        +rotate() IRotatable
-    }
-    class GameStatus {
-        <<interface>>
-        +name: string
-        +isPlaying() boolean
-        +isPaused() boolean
-        +isTerminal() boolean
-        +canAct() boolean
-        +pause() GameStatus
-        +resume() GameStatus
-    }
-    class BoardView {
-        +cells: CellView[]
-        +chains: ChainView[]
-    }
-    class CellView {
-        +nodeId: NodeId
-        +position: GridPosition
-        +terrain: CellTypeId
-    }
-    class ChainView {
-        +chainId: ChainId
-        +segments: GridPosition[]
-        +headDirection: Direction
-        +headPosition: GridPosition
-    }
+`GameSession` (invariantes del juego), `ScoringStrategy` (política de puntaje) y
+`SqlitePlayerProgressRepository` (persistencia) son tres clases para tres razones de cambio
+distintas. `GameSession` nunca calcula puntaje ni sabe de SQLite — delega en la política inyectada:
 
-    GameSession "1" *-- "1" Board
-    GameSession --> GameStatus
-    GameSession --> BoardView : view
-    Board "1" *-- "0..*" ArrowChain
-    ArrowChain ..|> IRotatable
-    BoardView "1" o-- "*" CellView
-    BoardView "1" o-- "*" ChainView
-
-    class Level {
-        -levelId: LevelId
-        -boardDefinition: BoardDefinition
-        -levelRules: LevelRules
-        -levelOrder: LevelOrder
-        +reconstitute(id, board, rules, order)$ Level
-        +isScorePlausible(score: Score) boolean
-        +startSession(scoring: ScoringStrategy) GameSession
-    }
-    class ILevelRepository {
-        <<interface>>
-        +findAll() Level[]
-        +findById(id: LevelId) Level
-    }
-    class BoardBuilder {
-        -definition: BoardDefinition
-        +build() Board
-    }
-    class CellFactory {
-        +create(data: CellRawData)$ CellType
-    }
-    class BoardDefinition {
-        +nodes: CellNode[]
-        +edges: Edge[]
-        +chains: ChainDefinition[]
-        +of(nodes, edges, chains)$ BoardDefinition
-    }
-    class ChainDefinition {
-        +id: ChainId
-        +nodeIds: NodeId[]
-        +head: NodeId
-        +tail: NodeId
-        +of(chainId, nodeIds)$ ChainDefinition
-    }
-
-    Level "1" *-- "1" BoardDefinition
-    Level ..> GameSession : startSession() crea
-    Level ..> BoardBuilder : usa
-    BoardBuilder ..> CellFactory : usa
-    BoardBuilder ..> Board : build()
-    BoardDefinition "1" *-- "0..*" ChainDefinition
-
-    class PlayerProgress {
-        -entries: Map~string, LevelProgress~
-        +empty()$ PlayerProgress
-        +reconstitute(levelProgresses)$ PlayerProgress
-        +recordAttempt(levelId, order, score) PlayerProgress
-        +isUnlocked(order: LevelOrder) boolean
-        +isCompleted(levelId: LevelId) boolean
-        +bestScoreOf(levelId: LevelId) Score
-    }
-    class LevelProgress {
-        -levelId: LevelId
-        -levelOrder: LevelOrder
-        -completed: boolean
-        -bestScore: Score
-        +fresh(levelId, order)$ LevelProgress
-        +reconstitute(...)$ LevelProgress
-        +recordCompletion(score: Score) LevelProgress
-        +isCompleted() boolean
-    }
-    class IPlayerProgressRepository {
-        <<interface>>
-        +load() PlayerProgress
-        +save(progress: PlayerProgress) void
-    }
-
-    PlayerProgress "1" *-- "0..*" LevelProgress
+```typescript
+// src/domain/game-session/GameSession.ts
+private static computeScore(
+  rules: LevelRules,
+  movesUsed: number,
+  failedMoves: number,
+  timeUsed: number,
+  scoring: ScoringStrategy,
+): Score {
+  return scoring.score({
+    maxPossibleScore: rules.maxPossibleScore,
+    movesUsed,
+    maxMoves: rules.maxMoves,
+    failedMoves,
+    timeUsedSec: timeUsed,
+    timeLimitSec: rules.timeLimit,
+  });
+}
 ```
 
-> **Nota:** `Level.startSession()`, `ScoringStrategy`, `GameEvent` y el agregado completo
-> `PlayerProgress`/`LevelProgress` **ya están implementados** — `CLAUDE.md` los marca como
-> "pendiente" en un comentario de árbol de carpetas que quedó desactualizado.
+Si cambia la fórmula de puntaje, se toca `ScoringStrategy` — nunca `GameSession`. Si cambia cómo
+se persiste el progreso, se toca `SqlitePlayerProgressRepository` — nunca los casos de uso que la
+consumen a través de `IPlayerProgressRepository`.
 
-### 2. Dominio — kernel compartido (cells, value objects, scoring, events)
+### O — Open/Closed
 
-```mermaid
-classDiagram
-    class CellType {
-        <<interface>>
-        +id: CellTypeId
-        +isPassable() boolean
-    }
-    class ArrowCell {
-        <<interface>>
-        +direction: Direction
-    }
-    class EmptyCell {
-        +id: "empty"
-        +isPassable() boolean
-    }
-    class ExitCell {
-        +id: "exit"
-        +isPassable() boolean
-    }
-    class WallCell {
-        +id: "wall"
-        +isPassable() boolean
-    }
-    class GridArrowCell {
-        +id: "grid_arrow"
-        +direction: Direction
-        +isPassable() boolean
-    }
-    ArrowCell --|> CellType
-    EmptyCell ..|> CellType
-    ExitCell ..|> CellType
-    WallCell ..|> CellType
-    GridArrowCell ..|> ArrowCell
+`ScoringStrategy` es la abstracción; `GameSession` depende solo de ella y jamás se modifica para
+sumar una fórmula nueva:
 
-    class CellNode {
-        +id: NodeId
-        +at: Position
-        +terrain: CellType
-        +isExit() boolean
-        +isArrowSeed() boolean
-    }
-    class Edge {
-        +from: NodeId
-        +to: NodeId
-        +connects(nodeId: NodeId) boolean
-    }
-    CellNode --> CellType
-    CellNode --> Position
+```typescript
+// src/domain/shared/services/ScoringStrategy.ts
+export interface ScoringStrategy {
+  score(input: ScoringInput): Score;
+}
 
-    class Position {
-        <<interface>>
-        +equals(other: Position) boolean
-    }
-    class GridPosition {
-        +of(row, column)$ GridPosition
-        +rowIndex: number
-        +columnIndex: number
-        +equals(other) boolean
-    }
-    class Direction {
-        <<interface>>
-        +id: string
-        +rotateClockwise() Direction
-        +equals(other: Direction) boolean
-    }
-    class GridDirection {
-        +Up$ GridDirection
-        +Right$ GridDirection
-        +Down$ GridDirection
-        +Left$ GridDirection
-        +of(id)$ GridDirection
-        +rotateClockwise() Direction
-    }
-    GridPosition ..|> Position
-    GridDirection ..|> Direction
+// src/domain/shared/services/FailedMovesScoringStrategy.ts
+export class FailedMovesScoringStrategy implements ScoringStrategy {
+  constructor(private readonly failedMoveWeight: number = 1) {}
+  score(input: ScoringInput): Score { /* penaliza solo movimientos fallidos */ }
+}
 
-    class NodeId { +of(value)$ NodeId +equals(other) boolean +toString() string }
-    class ChainId { +of(value)$ ChainId +equals(other) boolean +toString() string }
-    class LevelId { +of(value)$ LevelId +equals(other) boolean +toString() string }
-    class LevelOrder {
-        +of(value)$ LevelOrder
-        +sequence: number
-        +isFirst() boolean
-        +previous() LevelOrder
-    }
-    class LevelRules {
-        +of(timeLimitSeconds, maxMoves, maxPossibleScore)$ LevelRules
-        +timeLimit: number
-        +maxMoves: number
-        +maxPossibleScore: number
-    }
-    class Score {
-        +of(value)$ Score
-        +zero()$ Score
-        +points: number
-        +isGreaterThan(other: Score) boolean
-    }
-
-    class ScoringStrategy {
-        <<interface>>
-        +score(input: ScoringInput) Score
-    }
-    class FailedMovesScoringStrategy {
-        +score(input) Score
-    }
-    class TimeAndFailedMovesScoringStrategy {
-        +score(input) Score
-    }
-    FailedMovesScoringStrategy ..|> ScoringStrategy
-    TimeAndFailedMovesScoringStrategy ..|> ScoringStrategy
-
-    class GameEvent {
-        <<interface>>
-        +name: string
-    }
-    class ArrowChainExited {
-        +chainId: ChainId
-    }
-    class LevelCompleted {
-        +score: Score
-    }
-    ArrowChainExited ..|> GameEvent
-    LevelCompleted ..|> GameEvent
-
-    class DomainError {
-        +message: string
-    }
+// src/domain/shared/services/TimeAndFailedMovesScoringStrategy.ts
+export class TimeAndFailedMovesScoringStrategy implements ScoringStrategy {
+  constructor(
+    private readonly timeWeight: number = 0.5,
+    private readonly failedMoveWeight: number = 0.5,
+  ) {}
+  score(input: ScoringInput): Score { /* penaliza tiempo Y movimientos fallidos */ }
+}
 ```
 
-### 3. Aplicación — casos de uso y CQS
+Agregar una tercera política de puntaje es **crear una clase nueva** que implemente
+`ScoringStrategy` y cablearla en `container.ts` — cero cambios en `GameSession` ni en las
+existentes. Lo mismo pasa con `CellFactory` (`src/domain/level/CellFactory.ts`): un tipo de
+celda nuevo es un `case` más en el `switch` y una clase `CellType` nueva, sin tocar
+`WallCell`/`EmptyCell`/`ExitCell`.
 
-```mermaid
-classDiagram
-    class ICommandService~TCommand~ {
-        <<interface>>
-        +execute(command: TCommand) void
-    }
-    class IQueryService~TQuery, TResult~ {
-        <<interface>>
-        +execute(query: TQuery) TResult
-    }
+### L — Liskov Substitution
 
-    class GameCommand {
-        <<interface>>
-        +execute(session: GameSession) GameSession
-    }
-    class MoveArrowCommand {
-        +chainId: ChainId
-        +execute(session) GameSession
-    }
-    class RotateArrowCommand {
-        +chainId: ChainId
-        +execute(session) GameSession
-    }
-    class GameCommandInvoker {
-        -current: GameSession
-        +session: GameSession
-        +execute(command: GameCommand) GameSession
-        +tick(elapsedSeconds: number) GameSession
-    }
-    MoveArrowCommand ..|> GameCommand
-    RotateArrowCommand ..|> GameCommand
-    GameCommandInvoker --> GameCommand : ejecuta
-    GameCommandInvoker --> GameSession
+`WallCell` y `ExitCell` implementan `CellType` y son **intercambiables** en cualquier sitio que
+espere esa interfaz — el código que las consume nunca hace `instanceof`:
 
-    class RegisterUserUseCase { +execute(RegisterUserCommand) void }
-    class LoginUseCase { +execute(LoginQuery) LoginResult }
-    class GetLevelsUseCase { +execute(GetLevelsQuery) Level[] }
-    class StartGameUseCase { +execute(StartGameQuery) GameSession }
-    class CompleteLevelUseCase { +execute(CompleteLevelCommand) void }
-    class SyncProgressUseCase { +execute(SyncProgressCommand) void }
-    class LoadPlayerProgressUseCase { +execute(LoadPlayerProgressQuery) PlayerProgress }
-    class ClearLocalProgressUseCase { +execute(ClearLocalProgressCommand) void }
-    class RestorePlayerProgressUseCase { +execute(RestorePlayerProgressCommand) void }
-    class GetLeaderboardUseCase { +execute(GetLeaderboardQuery) LeaderboardEntryResult[] }
-    class SyncLeaderboardsUseCase { +execute(SyncLeaderboardsCommand) void }
+```typescript
+// src/domain/shared/board/cells/WallCell.ts
+export class WallCell implements CellType {
+  readonly id: CellTypeId = 'wall';
+  isPassable(): boolean { return false; }
+}
 
-    RegisterUserUseCase ..|> ICommandService
-    LoginUseCase ..|> IQueryService
-    GetLevelsUseCase ..|> IQueryService
-    StartGameUseCase ..|> IQueryService
-    CompleteLevelUseCase ..|> ICommandService
-    SyncProgressUseCase ..|> ICommandService
-    LoadPlayerProgressUseCase ..|> IQueryService
-    ClearLocalProgressUseCase ..|> ICommandService
-    RestorePlayerProgressUseCase ..|> ICommandService
-    GetLeaderboardUseCase ..|> IQueryService
-    SyncLeaderboardsUseCase ..|> ICommandService
+// src/domain/shared/board/cells/ExitCell.ts
+export class ExitCell implements CellType {
+  readonly id: CellTypeId = 'exit';
+  isPassable(): boolean { return true; }
+}
 
-    class IAuthRepository { <<interface>> }
-    class ILeaderboardRepository { <<interface>> }
-    class ILeaderboardCache { <<interface>> }
-    class IProgressSyncPort { <<interface>> +sync() void +fetchAll() ProgressEntry[] }
-    class ITokenStore { <<interface>> }
-
-    RegisterUserUseCase --> IAuthRepository
-    LoginUseCase --> IAuthRepository
-    LoginUseCase --> ITokenStore
-    GetLevelsUseCase --> ILevelRepository
-    StartGameUseCase --> ILevelRepository
-    StartGameUseCase --> ScoringStrategy
-    CompleteLevelUseCase --> IPlayerProgressRepository
-    CompleteLevelUseCase --> IProgressSyncPort
-    SyncProgressUseCase --> IProgressSyncPort
-    LoadPlayerProgressUseCase --> IPlayerProgressRepository
-    ClearLocalProgressUseCase --> IPlayerProgressRepository
-    RestorePlayerProgressUseCase --> ILevelRepository
-    RestorePlayerProgressUseCase --> IProgressSyncPort
-    RestorePlayerProgressUseCase --> IPlayerProgressRepository
-    GetLeaderboardUseCase --> ILeaderboardRepository
-    SyncLeaderboardsUseCase --> ILeaderboardRepository
-    SyncLeaderboardsUseCase --> ILeaderboardCache
+// src/domain/game-session/Board.ts — slideChain(): no le importa cuál subclase es
+const cell = this.terrainAt(next);
+if (!cell.isPassable()) {
+  return { board: this, outcome: 'Reverted' };
+}
 ```
 
-> Las acciones de juego (`moveArrow`/`rotateArrow`) **no son casos de uso** — no tocan
-> puertos. Se orquestan con `GameCommandInvoker` (patrón Command puro) desde
-> `useGameStore`, que llama directo a `GameSession`.
+`Board.slideChain` funciona igual sin importar si `cell` es `WallCell`, `EmptyCell` o `ExitCell`:
+cualquiera puede sustituir a `CellType` sin romper el comportamiento esperado por quien la usa.
 
-### 4. Adaptadores e infraestructura
+### I — Interface Segregation
 
-```mermaid
-classDiagram
-    class AuthGuardCommandDecorator~TCommand~ {
-        -decoratee: ICommandService~TCommand~
-        -tokenStore: ITokenStore
-        +execute(command) void
-    }
-    class AuthGuardQueryDecorator~TQuery, TResult~ {
-        +execute(query) TResult
-    }
-    class LoggingCommandDecorator~TCommand~ {
-        -logger: ILogger
-        -timeProvider: ITimeProvider
-        +execute(command) void
-    }
-    class LoggingQueryDecorator~TQuery, TResult~ {
-        +execute(query) TResult
-    }
-    class PerformanceQueryDecorator~TQuery, TResult~ {
-        -slowThresholdMs: number
-        +execute(query) TResult
-    }
-    class CachingQueryDecorator~TQuery, TResult~ {
-        -cache: Map
-        -ttlMs: number
-        +execute(query) TResult
-    }
-    class ICommandService~T~ { <<interface>> }
-    class IQueryService~T, R~ { <<interface>> }
+`CellType` es deliberadamente mínima (`id` + `isPassable()`); rotar es una interfaz **separada**
+(`IRotatable`) que solo implementa `ArrowChain`, para no forzar a las celdas de terreno a cargar
+con un método que no les corresponde:
 
-    AuthGuardCommandDecorator ..|> ICommandService
-    LoggingCommandDecorator ..|> ICommandService
-    AuthGuardQueryDecorator ..|> IQueryService
-    LoggingQueryDecorator ..|> IQueryService
-    PerformanceQueryDecorator ..|> IQueryService
-    CachingQueryDecorator ..|> IQueryService
+```typescript
+// src/domain/shared/board/cells/CellType.ts
+export interface CellType {
+  readonly id: CellTypeId;
+  isPassable(): boolean;
+}
 
-    class HttpAuthRepository { +register() void +login() LoginResult }
-    class HttpLeaderboardRepository { +findTop() LeaderboardEntryResult[] }
-    class HttpLevelRepository { -cachedLevels: Level[] +findAll() Level[] +findById() Level }
-    class HttpProgressSyncAdapter { +sync() void +fetchAll() ProgressEntry[] }
-    class SqliteLeaderboardRepository { +findTop() LeaderboardEntryResult[] +replaceTop() void }
-    class SqlitePlayerProgressRepository { +load() PlayerProgress +save() void }
-
-    HttpAuthRepository ..|> IAuthRepository
-    HttpLeaderboardRepository ..|> ILeaderboardRepository
-    HttpLevelRepository ..|> ILevelRepository
-    HttpProgressSyncAdapter ..|> IProgressSyncPort
-    SqliteLeaderboardRepository ..|> ILeaderboardRepository
-    SqliteLeaderboardRepository ..|> ILeaderboardCache
-    SqlitePlayerProgressRepository ..|> IPlayerProgressRepository
-
-    class ILeaderboardStore { <<interface>> +loadTop() LeaderboardEntryRow[] +replaceForLevel() void }
-    class IPlayerProgressStore { <<interface>> +loadAll() PlayerProgressRow[] +saveAll() void }
-    class IHttpClient { <<interface>> +get() T +post() T }
-
-    class SqliteLeaderboardStore { +loadTop() LeaderboardEntryRow[] +replaceForLevel() void }
-    class SqlitePlayerProgressStore { +loadAll() PlayerProgressRow[] +saveAll() void }
-    class HttpClient { +get() T +post() T }
-    class SecureTokenStore { +saveSession() void +getAccessToken() string +clearSession() void }
-    class ExpoAudioService { +getInstance(sources)$ ExpoAudioService +playEffect() void +setMuted() void }
-    class SystemTimeProvider { +now() number }
-    class ConsoleLogger { +info() void +warn() void +error() void }
-    class I18nLocalizationService { +translate() string +getLocale() string +setLocale() void }
-
-    SqliteLeaderboardRepository --> ILeaderboardStore
-    SqlitePlayerProgressRepository --> IPlayerProgressStore
-    SqliteLeaderboardStore ..|> ILeaderboardStore
-    SqlitePlayerProgressStore ..|> IPlayerProgressStore
-    HttpClient ..|> IHttpClient
-    SecureTokenStore ..|> ITokenStore
-    ExpoAudioService ..|> IAudioService
-    SystemTimeProvider ..|> ITimeProvider
-    ConsoleLogger ..|> ILogger
-    I18nLocalizationService ..|> ILocalizationService
-
-    class LevelMapper { +toDomain(dto: LevelDTO)$ Level }
-    class PlayerProgressMapper { +toDomain(rows)$ PlayerProgress +toRows(progress)$ PlayerProgressRow[] }
-    class LeaderboardMapper { +toDomain(dtos)$ LeaderboardEntryResult[] }
+// src/domain/game-session/IRotatable.ts
+export interface IRotatable {
+  rotate(): IRotatable;
+}
 ```
 
-Las **presenters** (`useAuthStore`, `useGameStore`, `useLevelsStore`, `useLeaderboardStore`)
-no son clases sino *factory functions* que devuelven un store Zustand — por eso no aparecen
-en el diagrama UML. Su forma real:
+Si `CellType` incluyera `rotate()`, `WallCell` y `ExitCell` tendrían que implementar un método
+que no tiene sentido para terreno estático. Lo mismo aplica a los puertos técnicos
+(`ITokenStore`, `IAudioService`, `ILogger`): cada uno es chico y de un solo propósito, en vez de
+una interfaz gigante tipo `IInfra` con todo adentro.
 
-| Store | Estado expuesto | Casos de uso inyectados |
-| --- | --- | --- |
-| `createAuthStore` | `session, isAuthenticating, error` + `register, login, logout, restoreSession` | `RegisterUserUseCase`, `LoginUseCase`, `ClearLocalProgressUseCase`, `RestorePlayerProgressUseCase`, `ITokenStore` |
-| `createGameStore` | `session: GameSession \| null, isLoading, error` + `startGame, moveArrow, rotateArrow, tick` | `StartGameUseCase`, `CompleteLevelUseCase`, `IAudioService` (sostiene un `GameCommandInvoker` interno) |
-| `createLevelsStore` | `levels, progress, isLoading, error` + `loadLevels, isUnlocked` | `GetLevelsUseCase`, `LoadPlayerProgressUseCase`, `SyncLeaderboardsUseCase` |
-| `createLeaderboardStore` | `entries, isLoading, error` + `loadLeaderboard` | `GetLeaderboardUseCase` |
+### D — Dependency Inversion
 
-`infrastructure/di/container.ts` es el **Composition Root**: instancia todos los adaptadores
-concretos de arriba, arma la cadena de decoradores (`AuthGuard → Logging →
-Performance/Caching → caso de uso real`) y crea los 4 stores — es el único archivo del
-proyecto que conoce clases concretas.
+Los casos de uso dependen de la **abstracción** del repositorio (`ILevelRepository`, definida en
+el dominio), nunca de `HttpLevelRepository`:
+
+```typescript
+// src/domain/level/ILevelRepository.ts
+export interface ILevelRepository {
+  findAll(): Promise<Level[]>;
+  findById(id: LevelId): Promise<Level | null>;
+}
+
+// src/application/use-cases/levels/GetLevelsUseCase.ts
+export class GetLevelsUseCase implements IQueryService<GetLevelsQuery, Level[]> {
+  constructor(private readonly levelRepository: ILevelRepository) {}
+
+  async execute(_query: GetLevelsQuery): Promise<Level[]> {
+    const levels = await this.levelRepository.findAll();
+    return [...levels].sort((a, b) => a.order.sequence - b.order.sequence);
+  }
+}
+```
+
+`GetLevelsUseCase` no sabe que la implementación real es HTTP — podría ser una en memoria
+(como `InMemoryLevelRepository` en los tests) sin cambiar una línea del caso de uso. Solo
+`infrastructure/di/container.ts` conoce la clase concreta y la inyecta.
 
 ---
 
-## AOP — decoradores implementados
+## Patrones de diseño (GoF)
+
+Solo los que están **realmente implementados y cumplen su función** en este código — no la
+lista aspiracional de `CLAUDE.md`, ni patrones a medias. Se excluyeron explícitamente por no
+cumplir su función completa: **Abstract Factory** (solo hay Factory Method, no una familia de
+fábricas), **Builder** (`BoardBuilder` arma el `Board` en pasos, pero desde un `BoardDefinition`
+ya parseado, no desde JSON/YAML, y no ensambla reglas ni elementos opcionales), **Facade** (no
+existe ningún `GameServiceFacade` ni equivalente), **Template Method** (`Level` es una clase
+concreta, no hay una `BaseLevel` abstracta con subclases), y **Command** (`MoveArrowCommand`/
+`GameCommandInvoker` encapsulan la acción, pero el proyecto decidió explícitamente no tener
+historial ni undo/redo, que es parte de la función pedida).
+
+### Creacionales
+
+#### Factory Method
+
+`CellFactory.create()` decide la subclase de `CellType` sin que el caller conozca
+`WallCell`/`EmptyCell`/`ExitCell`/`GridArrowCell`:
+
+```typescript
+// src/domain/level/CellFactory.ts
+export class CellFactory {
+  static create(data: CellRawData): CellType {
+    switch (data.type) {
+      case 'grid_arrow':
+        return new GridArrowCell(GridDirection.of(CellFactory.requireDirection(data)));
+      case 'wall':
+        return new WallCell();
+      case 'empty':
+        return new EmptyCell();
+      case 'exit':
+        return new ExitCell();
+      default:
+        throw new DomainError(`Unknown cell type: ${data.type as string}`);
+    }
+  }
+}
+```
+
+#### Singleton
+
+`ExpoAudioService` (el gestor global de audio) expone un único punto de acceso
+(`getInstance`), con constructor privado:
+
+```typescript
+// src/infrastructure/audio/ExpoAudioService.ts
+export class ExpoAudioService implements IAudioService {
+  private static instance: ExpoAudioService | null = null;
+
+  private constructor(sources: Record<string, AudioSource>) {
+    this.players = ExpoAudioService.preload(sources);
+  }
+
+  static getInstance(sources: Record<string, AudioSource>): ExpoAudioService {
+    if (ExpoAudioService.instance === null) {
+      ExpoAudioService.instance = new ExpoAudioService(sources);
+    }
+    return ExpoAudioService.instance;
+  }
+}
+```
+
+### Estructurales
+
+#### Composite
+
+`BoardView` uniforma celdas sueltas y cadenas de varios nodos bajo la misma proyección de
+solo-lectura para pintar — la UI no distingue "una celda" de "un tren de nodos":
+
+```typescript
+// src/domain/game-session/BoardView.ts
+export class ChainView {
+  constructor(
+    readonly chainId: ChainId,
+    readonly segments: readonly GridPosition[],
+    readonly headDirection: Direction,
+  ) {}
+}
+
+export class BoardView {
+  constructor(
+    readonly cells: readonly CellView[],
+    readonly chains: readonly ChainView[],
+  ) {}
+}
+```
+
+#### Adapter
+
+`HttpClient` adapta `fetch` (red) al puerto `IHttpClient`; `SqlitePlayerProgressRepository`
+adapta `expo-sqlite` (persistencia) al puerto `IPlayerProgressRepository` — nadie fuera de
+infraestructura conoce la librería concreta:
+
+```typescript
+// src/interface-adapters/ports/IHttpClient.ts
+export interface IHttpClient {
+  get<T>(path: string): Promise<T>;
+  post<T>(path: string, body: unknown): Promise<T>;
+}
+
+// src/infrastructure/http/HttpClient.ts
+export class HttpClient implements IHttpClient {
+  async get<T>(path: string): Promise<T> {
+    return this.request<T>('GET', path);
+  }
+  async post<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>('POST', path, body);
+  }
+  // request(): arma la llamada real a fetch() y normaliza no-2xx en HttpError
+}
+```
+
+### Comportamiento
+
+#### Strategy
+
+`ScoringStrategy` es la política de puntaje intercambiable en tiempo de ejecución;
+`GameSession` depende solo de la interfaz, nunca de una fórmula concreta:
+
+```typescript
+// src/domain/shared/services/ScoringStrategy.ts
+export interface ScoringStrategy {
+  score(input: ScoringInput): Score;
+}
+
+// src/domain/shared/services/FailedMovesScoringStrategy.ts
+export class FailedMovesScoringStrategy implements ScoringStrategy {
+  constructor(private readonly failedMoveWeight: number = 1) {}
+  score(input: ScoringInput): Score { /* penaliza solo movimientos fallidos */ }
+}
+```
+
+#### Observer
+
+`GameSession` acumula `GameEvent` (`ArrowChainExited`, `LevelCompleted`) durante una
+transición; el store los drena con `pullEvents()` y notifica a la UI y al audio:
+
+```typescript
+// src/domain/shared/events/GameEvent.ts
+export interface GameEvent {
+  readonly name: string;
+}
+export class ArrowChainExited implements GameEvent {
+  readonly name = 'ArrowChainExited' as const;
+  constructor(readonly chainId: ChainId) {}
+}
+
+// src/domain/game-session/GameSession.ts
+pullEvents(): readonly GameEvent[] {
+  return this.state.events;
+}
+
+// src/interface-adapters/presenters/useGameStore.ts
+if (session.pullEvents().some((event) => event.name === 'ArrowChainExited')) {
+  void deps.audioService.playEffect(SFX.chainExit);
+}
+```
+
+#### State
+
+`GameStatus` gestiona el ciclo de vida de la partida con estados explícitos
+(`Playing`/`Paused`/`Victory`/`Defeat`), en vez de un `switch` sobre un enum disperso:
+
+```typescript
+// src/domain/game-session/value-objects/GameStatus.ts
+export interface GameStatus {
+  readonly name: 'Playing' | 'Paused' | 'Victory' | 'Defeat';
+  canAct(): boolean;
+  pause(): GameStatus;
+  resume(): GameStatus;
+}
+
+class PlayingStatus implements GameStatus {
+  readonly name = 'Playing' as const;
+  canAct(): boolean { return true; }
+  pause(): GameStatus { return GameStatus.Paused; }
+  resume(): GameStatus { return this; }
+  // ...
+}
+
+export const GameStatus = {
+  Playing: new PlayingStatus() as GameStatus,
+  Paused: new PausedStatus() as GameStatus,
+  Victory: new VictoryStatus() as GameStatus,
+  Defeat: new DefeatStatus() as GameStatus,
+} as const;
+```
+
+> **Decorator**: sí está implementado en el proyecto, pero no decorando celdas — decora los
+> puertos CQS para AOP (logging, auth guard, performance, caching). Desarrollado en detalle,
+> con la cadena completa de composición, en la sección siguiente.
+
+---
+
+## AOP con SOLID
 
 El proyecto **no usa ninguna librería de AOP** (nada de `reflect-metadata`, decoradores
 `@Injectable`/`@Around`, etc.). Los *cross-cutting concerns* (logging, autenticación,
@@ -714,102 +483,183 @@ lleva AuthGuard": corre desde `logout()`, potencialmente **después** de que la 
 borró, así que solo lleva `Logging` — exigir sesión activa para limpiar datos locales al
 cerrar sesión sería una contradicción.
 
-### SOLID en esta implementación
+### Qué aspectos de AOP se aplicaron, y cómo cumple cada uno con SOLID
 
-- **S — Single Responsibility.** Cada decorador tiene **una** razón de cambio:
-  `AuthGuardCommandDecorator` solo sabe verificar sesión, `LoggingCommandDecorator` solo sabe
-  narrar entrada/salida/duración, `CachingQueryDecorator` solo sabe memoizar. El caso de uso
-  real conserva su única responsabilidad (la regla de negocio) sin mezclarse con logging o
-  auth — si mañana cambia el formato de los logs, se toca `LoggingQueryDecorator` y ningún
-  caso de uso.
-- **O — Open/Closed.** Agregar un aspecto nuevo (por ejemplo, un `RetryQueryDecorator`) es
-  **crear una clase nueva** que implemente `IQueryService`, sin tocar ni el caso de uso ni
-  los decoradores existentes. `CachingQueryDecorator` es además genérico sobre
-  `TQuery`/`TResult` — sirve para cualquier query futura sin modificarlo, el Composition Root
-  es quien decide a cuál envolver.
-- **L — Liskov Substitution.** Cualquier decorador es sustituible en cualquier lugar donde se
-  espera un `ICommandService<TCommand>`/`IQueryService<TQuery, TResult>`: por eso se pueden
-  anidar sin que el código que los consume (los presenters) note la diferencia entre un caso
-  de uso "pelado" y una cadena de 3 decoradores — todos cumplen el mismo contrato.
-- **I — Interface Segregation.** `ICommandService`/`IQueryService` son interfaces de **un
-  solo método** (`execute`). Ningún decorador se ve forzado a implementar algo que no usa;
-  contrastá esto con una interfaz gorda tipo `IUseCase` con `executeCommand()` +
-  `executeQuery()`, que obligaría a cada decorador Command a cargar con un método Query vacío.
-- **D — Dependency Inversion.** Los decoradores dependen de **abstracciones**: el
-  `decoratee` es del tipo del puerto (`ICommandService`/`IQueryService`), nunca de la clase
-  concreta del caso de uso; y las dependencias técnicas (`ILogger`, `ITimeProvider`,
-  `ITokenStore`) son interfaces de `application/ports/`, no `ConsoleLogger`/
-  `SystemTimeProvider`/`SecureTokenStore` directamente. Solo `container.ts` conoce esas
-  clases concretas — los decoradores ni se enteran.
+Cuatro aspectos, cada uno su propia clase (par Command/Query), con el código exacto de por
+qué cumple SOLID — no una explicación aparte del principio, sino la razón puntual de **este**
+decorador.
 
----
+#### 1. AuthGuard — verificación de sesión
 
-## Reglas del juego (invariantes de `GameSession`)
+`AuthGuardCommandDecorator` / `AuthGuardQueryDecorator`: antes de delegar, preguntan
+`tokenStore.hasActiveSession()`; si no hay sesión, lanzan `Error('Not authenticated')` y **ni
+siquiera llaman** al caso de uso real.
 
-- El tablero es un **grafo** (nodos + adyacencia direccional precomputada), no una grilla;
-  `row`/`column` solo posicionan en pantalla.
-- Una flecha es una **cadena** (`ArrowChain`): cabeza + cuerpo, se mueve como una unidad.
-  El orden `cola → cabeza` viene explícito del backend (`chains[].nodeIds`), no se infiere.
-- `moveArrow`: la cadena se desliza mientras el siguiente nodo sea transitable y libre; si
-  choca contra un muro, el borde del grafo, u otra cadena, **vuelve completa a su posición
-  original** — pero el intento igual cuenta como movimiento usado.
-- `rotateArrow`: rota la cabeza 90° cíclicamente (`Up → Right → Down → Left`). Nunca
-  incrementa `movesUsed`.
-- **Victoria:** no queda ninguna `ArrowChain` en el tablero.
-- **Derrota:** se agota `maxMoves`, se agota `timeLimit`, o ninguna cadena tiene un
-  movimiento legal (deadlock).
+```typescript
+// src/interface-adapters/decorators/AuthGuardCommandDecorator.ts
+export class AuthGuardCommandDecorator<TCommand> implements ICommandService<TCommand> {
+  constructor(
+    private readonly decoratee: ICommandService<TCommand>,
+    private readonly tokenStore: ITokenStore,
+  ) {}
 
-Detalle completo en [`CLAUDE.md` §6](./CLAUDE.md#6-reglas-del-juego-invariantes-de-gamesession).
-
----
-
-## Arquitectura de testing
-
-Arquitectura de 3 niveles (ver [`CLAUDE.md` §12](./CLAUDE.md#12-testing-architecture--3-levels-professors-approach)):
-
-1. **Object Mother** (`test/**/_mothers/`) — construye agregados y VOs válidos.
-2. **Testing API** (`test/**/_testing-apis/`) — un `given/when/then` por caso de uso; solo
-   ahí viven los mocks y los `expect()`.
-3. **Test / `it()`** — lenguaje de negocio puro, orquesta `given → when → then`.
-   Convención de nombres: `should_[resultado_esperado]_when_[condición]`.
-
-VOs y agregados de dominio son la única excepción: al no depender de nada externo, usan la
-Mother directamente y llaman `expect()` sin Testing API.
-
-```bash
-npm test            # unit (dominio + casos de uso)
-npm run test:watch
-npm run test:coverage
+  async execute(command: TCommand): Promise<void> {
+    const hasSession = await this.tokenStore.hasActiveSession();
+    if (!hasSession) {
+      throw new Error('Not authenticated');
+    }
+    await this.decoratee.execute(command);
+  }
+}
 ```
 
----
+- **S**: su única razón de cambio es la política de autenticación — no loguea, no cachea, no
+  mide tiempo.
+- **L**: implementa `ICommandService<TCommand>`, el mismo contrato que el caso de uso que
+  envuelve, así que `container.ts` lo sustituye en cualquier lugar donde se esperaba el caso
+  de uso pelado, sin que nadie más se entere.
+- **D**: depende de `ITokenStore` (puerto de `application/ports/`) y de
+  `ICommandService<TCommand>` (puerto CQS) — nunca de `SecureTokenStore` ni de
+  `RegisterUserUseCase` concretos.
 
-## Cómo correr el proyecto
+#### 2. Logging — trazabilidad de entrada/salida/duración
 
-```bash
-npm install
-npx expo start          # desarrollo (Expo Go / dev client)
-npm run android          # abrir directo en emulador/dispositivo Android
-npm run ios              # ídem iOS
-npm run web               # preview web (login/registro solamente — expo-secure-store no soporta web)
+`LoggingCommandDecorator` / `LoggingQueryDecorator`: loguean `"<caso> started"` antes, y
+`"<caso> completed"` (con `durationMs`) o `"<caso> failed"` (con el error) después, en un
+`try/catch` que siempre re-lanza.
 
-npm run typecheck         # tsc --noEmit
-npm test                  # jest
-eas build -p android      # APK de release (ver eas.json)
+```typescript
+// src/interface-adapters/decorators/LoggingCommandDecorator.ts
+export class LoggingCommandDecorator<TCommand> implements ICommandService<TCommand> {
+  constructor(
+    private readonly decoratee: ICommandService<TCommand>,
+    private readonly logger: ILogger,
+    private readonly timeProvider: ITimeProvider,
+    private readonly useCaseName: string,
+  ) {}
+
+  async execute(command: TCommand): Promise<void> {
+    const startedAt = this.timeProvider.now();
+    this.logger.info(`${this.useCaseName} started`, { command });
+    try {
+      await this.decoratee.execute(command);
+      this.logger.info(`${this.useCaseName} completed`, {
+        durationMs: this.timeProvider.now() - startedAt,
+      });
+    } catch (error) {
+      this.logger.error(`${this.useCaseName} failed`, {
+        durationMs: this.timeProvider.now() - startedAt,
+        error,
+      });
+      throw error;
+    }
+  }
+}
 ```
 
-La URL base del backend se configura en `app.config.ts` (`extra.apiBaseUrl`).
+- **S**: su única razón de cambio es el formato/contenido del log — si mañana cambia a JSON
+  estructurado, se toca esta clase y ninguna otra.
+- **O**: se agrega a cualquier caso de uso nuevo envolviéndolo en `container.ts`, sin tocar
+  `LoggingCommandDecorator` ni el caso de uso.
+- **D**: depende de `ILogger`/`ITimeProvider` (puertos), nunca de `ConsoleLogger`/
+  `SystemTimeProvider` concretos — se podría cambiar a un logger remoto sin tocar esta clase.
 
----
+#### 3. Performance — alerta de queries lentas
 
-## Conventional Commits
+`PerformanceQueryDecorator`: mide la duración con `ITimeProvider` y solo emite
+`logger.warn(...)` si supera `slowThresholdMs` (1000ms por defecto). A diferencia de
+`LoggingQueryDecorator`, que narra **toda** llamada, este solo se queja de las **lentas**.
 
-Mensajes en inglés, sin atribución de IA:
+```typescript
+// src/interface-adapters/decorators/PerformanceQueryDecorator.ts
+export class PerformanceQueryDecorator<TQuery, TResult>
+  implements IQueryService<TQuery, TResult>
+{
+  constructor(
+    private readonly decoratee: IQueryService<TQuery, TResult>,
+    private readonly logger: ILogger,
+    private readonly timeProvider: ITimeProvider,
+    private readonly useCaseName: string,
+    private readonly slowThresholdMs: number = 1000,
+  ) {}
 
+  async execute(query: TQuery): Promise<TResult> {
+    const startedAt = this.timeProvider.now();
+    const result = await this.decoratee.execute(query);
+    const durationMs = this.timeProvider.now() - startedAt;
+    if (durationMs > this.slowThresholdMs) {
+      this.logger.warn(`${this.useCaseName} took ${durationMs}ms`, { durationMs });
+    }
+    return result;
+  }
+}
 ```
-feat(game-session): add chain sliding movement
-fix(board): read chain order from chains[] instead of walking edges
-refactor(domain): move CellFactory and BoardBuilder to domain layer
-test(game-session): add moveArrow chain tests
-docs(readme): add clean architecture diagram
+
+- **S**: es una clase **separada** de `LoggingQueryDecorator` precisamente porque "narrar toda
+  llamada" y "alertar solo las lentas" son dos razones de cambio distintas, aunque ambas
+  midan tiempo.
+- **O**: genérico sobre `TQuery`/`TResult` — hoy solo envuelve `StartGameUseCase` (ver
+  `container.ts`), pero sirve para cualquier query costosa futura sin modificarse.
+
+#### 4. Caching — memoización con TTL
+
+`CachingQueryDecorator`: memoiza el resultado en un `Map` interno con TTL, usando una función
+`keyOf(query)` inyectada para construir la clave — así es genérico sobre cualquier query, no
+conoce `GetLeaderboardUseCase` ni ningún caso de uso concreto.
+
+```typescript
+// src/interface-adapters/decorators/CachingQueryDecorator.ts
+export class CachingQueryDecorator<TQuery, TResult>
+  implements IQueryService<TQuery, TResult>
+{
+  private readonly cache = new Map<string, CacheEntry<TResult>>();
+
+  constructor(
+    private readonly decoratee: IQueryService<TQuery, TResult>,
+    private readonly timeProvider: ITimeProvider,
+    private readonly ttlMs: number,
+    private readonly keyOf: (query: TQuery) => string,
+  ) {}
+
+  async execute(query: TQuery): Promise<TResult> {
+    const key = this.keyOf(query);
+    const now = this.timeProvider.now();
+    const cached = this.cache.get(key);
+    if (cached !== undefined && cached.expiresAt > now) {
+      return cached.result;
+    }
+    const result = await this.decoratee.execute(query);
+    this.cache.set(key, { result, expiresAt: now + this.ttlMs });
+    return result;
+  }
+}
+```
+
+- **S**: su única razón de cambio es la política de invalidación de cache (hoy TTL fijo) —
+  no sabe nada de leaderboards ni de ningún dominio.
+- **O**: agregar cache a una query nueva es pasarle su propio `keyOf` en `container.ts`, sin
+  tocar esta clase; hoy solo envuelve `GetLeaderboardUseCase`
+  (`(query) => \`${query.levelId.toString()}:${query.limit}\``).
+- **D**: depende de `ITimeProvider` (puerto), nunca de `Date.now()` directo — así el TTL es
+  testeable con un reloj fake.
+
+#### Los cuatro comparten (I y L)
+
+- **I — Interface Segregation**: los cuatro implementan `ICommandService<TCommand>` o
+  `IQueryService<TQuery, TResult>` — interfaces de **un solo método** (`execute`). Ninguno
+  carga con un método que no usa; por eso hay pares Command/Query separados en vez de una
+  interfaz `IUseCase` con `executeCommand()` + `executeQuery()`.
+- **L — Liskov Substitution**: como los cuatro cumplen el mismo contrato que el caso de uso
+  que envuelven, `container.ts` los anida sin que ninguno note si por dentro hay un caso de
+  uso "pelado" o ya envuelto dos veces:
+
+```typescript
+// src/infrastructure/di/container.ts
+const decoratedStartGameUseCase = new AuthGuardQueryDecorator(
+  new LoggingQueryDecorator(
+    new PerformanceQueryDecorator(startGameUseCase, logger, timeProvider, 'StartGameUseCase'),
+    logger, timeProvider, 'StartGameUseCase',
+  ),
+  tokenStore,
+);
 ```
