@@ -161,11 +161,19 @@ const decoratedGetLeaderboardUseCase = new AuthGuardQueryDecorator(
   tokenStore,
 );
 
+// Consumed directly by UI/audio code, not through any use case (§4). Instantiated
+// here (before the presenters) because useGameStore now also depends on it to
+// play sound effects on game events (§4: "the store... republishes to UI and audio").
+// TODO: pass the real effect id -> asset map once sound files exist.
+export const audioService = ExpoAudioService.getInstance({});
+export const localizationService = new I18nLocalizationService();
+
 // --- Capa 3: presenters (Zustand), wired with the decorated use cases -------
 
 export const useGameStore = createGameStore({
   startGameUseCase: decoratedStartGameUseCase,
   completeLevelUseCase: decoratedCompleteLevelUseCase,
+  audioService,
 });
 
 export const useLevelsStore = createLevelsStore({
@@ -186,8 +194,3 @@ export const useLeaderboardStore = createLeaderboardStore({
 // Exposed for a future "retry sync" action (e.g. on app resume) — not wired to
 // a presenter yet, since none of the 4 stores call it today.
 export { decoratedSyncProgressUseCase as syncProgressUseCase };
-
-// Consumed directly by UI/audio code, not through any use case (§4).
-// TODO: pass the real effect id -> asset map once sound files exist.
-export const audioService = ExpoAudioService.getInstance({});
-export const localizationService = new I18nLocalizationService();
