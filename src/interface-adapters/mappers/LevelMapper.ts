@@ -1,11 +1,11 @@
 import { CellFactory } from '../../domain/level/CellFactory';
 import { Level } from '../../domain/level/Level';
+import { PositionFactory } from '../../domain/level/PositionFactory';
 import { BoardDefinition } from '../../domain/level/value-objects/BoardDefinition';
 import { ChainDefinition } from '../../domain/level/value-objects/ChainDefinition';
 import { CellNode } from '../../domain/shared/board/CellNode';
 import { Edge } from '../../domain/shared/board/Edge';
 import { ChainId } from '../../domain/shared/value-objects/ChainId';
-import { GridPosition } from '../../domain/shared/value-objects/GridPosition';
 import { LevelId } from '../../domain/shared/value-objects/LevelId';
 import { LevelOrder } from '../../domain/shared/value-objects/LevelOrder';
 import { LevelRules } from '../../domain/shared/value-objects/LevelRules';
@@ -24,8 +24,17 @@ export class LevelMapper {
       (node) =>
         new CellNode(
           NodeId.of(node.id),
-          GridPosition.of(node.row, node.column),
-          CellFactory.create({ type: node.type, direction: node.direction }),
+          PositionFactory.create({
+            positionType: node.positionType,
+            row: node.row,
+            column: node.column,
+            layer: node.layer,
+          }),
+          CellFactory.create({
+            type: node.type,
+            direction: node.direction,
+            positionType: node.positionType,
+          }),
         ),
     );
 

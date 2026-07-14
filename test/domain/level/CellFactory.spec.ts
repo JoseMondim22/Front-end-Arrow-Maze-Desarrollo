@@ -45,4 +45,27 @@ describe('CellFactory', () => {
       CellFactory.create({ type: 'lava' as never }),
     ).toThrow(DomainError);
   });
+
+  it('should_create_a_grid_arrow_cell_with_a_3d_direction_when_positionType_is_grid3d', () => {
+    const cell = CellFactory.create({
+      type: 'grid_arrow',
+      direction: 'forward',
+      positionType: 'grid3d',
+    });
+
+    expect(cell.id).toBe('grid_arrow');
+    expect(cell.isPassable()).toBe(true);
+  });
+
+  it('should_fail_when_direction_is_not_a_known_3d_id', () => {
+    expect(() =>
+      CellFactory.create({ type: 'grid_arrow', direction: 'north', positionType: 'grid3d' }),
+    ).toThrow(DomainError);
+  });
+
+  it('should_fail_when_positionType_is_unknown', () => {
+    expect(() =>
+      CellFactory.create({ type: 'grid_arrow', direction: 'up', positionType: 'hexagon' }),
+    ).toThrow(DomainError);
+  });
 });

@@ -2,7 +2,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useGameStore } from '../../infrastructure/di/container';
-import { BoardView } from '../components/BoardView';
+import { BoardRenderer } from '../components/BoardRenderer';
 import { HUD } from '../components/HUD';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors, spacing, typography } from '../theme';
@@ -82,7 +82,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         timeUsedSeconds={session.timeUsed}
         timeLimitSeconds={level.rules.timeLimit}
       />
-      <BoardView
+      <BoardRenderer
         view={session.view}
         onMoveChain={moveArrow}
         onRotateChain={rotateArrow}

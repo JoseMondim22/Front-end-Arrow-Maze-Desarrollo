@@ -24,4 +24,11 @@ describe('GridDirection', () => {
   it('should_fail_when_id_is_not_a_known_direction', () => {
     expect(() => GridDirection.of('north')).toThrow(DomainError);
   });
+
+  it('should_resolve_the_opposite_heading', () => {
+    expect(GridDirection.Up.opposite().id).toBe('down');
+    expect(GridDirection.Down.opposite().id).toBe('up');
+    expect(GridDirection.Right.opposite().id).toBe('left');
+    expect(GridDirection.Left.opposite().id).toBe('right');
+  });
 });

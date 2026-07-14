@@ -9,5 +9,8 @@
 export interface Direction {
   readonly id: string;
   rotateClockwise(): Direction;
+  /** The heading that undoes this one (e.g. up <-> down). BoardBuilder uses this to
+   * fill in the reverse adjacency entry for an edge's other endpoint. */
+  opposite(): Direction;
   equals(other: Direction): boolean;
 }

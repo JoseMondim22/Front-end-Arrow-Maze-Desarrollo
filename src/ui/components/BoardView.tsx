@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import type {
-  BoardView as BoardViewModel,
-  ChainView as ChainViewModel,
-} from '../../domain/game-session/BoardView';
 import type { ChainId } from '../../domain/shared/value-objects/ChainId';
 import { colors, radii, spacing } from '../theme';
 import { CellView } from './CellView';
 import { ChainView } from './ChainView';
+import type { Grid2DBoardView, Grid2DChainView } from './grid2dTypes';
 
 interface Props {
-  view: BoardViewModel;
+  view: Grid2DBoardView;
   onMoveChain: (chainId: ChainId) => void;
   onRotateChain: (chainId: ChainId) => void;
 }
@@ -35,8 +32,8 @@ export function BoardView({ view, onMoveChain, onRotateChain }: Props): React.JS
   // regardless of which edge it left through.
   const exitTravelCells = rows + columns;
 
-  const knownChainsRef = useRef<Map<string, ChainViewModel>>(new Map());
-  const [exitingChains, setExitingChains] = useState<readonly ChainViewModel[]>([]);
+  const knownChainsRef = useRef<Map<string, Grid2DChainView>>(new Map());
+  const [exitingChains, setExitingChains] = useState<readonly Grid2DChainView[]>([]);
 
   useEffect(() => {
     const currentIds = new Set(view.chains.map((chain) => chain.chainId.toString()));

@@ -1,4 +1,6 @@
 import { DomainError } from '../errors/DomainError';
+import { Direction } from './Direction';
+import { GridDirection } from './GridDirection';
 import { Position } from './Position';
 
 /**
@@ -6,9 +8,12 @@ import { Position } from './Position';
  * Value Object: immutable, compared by value.
  *
  * row/column are used ONLY to paint the node on screen and, once, by BoardBuilder
- * to derive directional adjacency. No movement rule reads them during play.
+ * (via directionTo) to derive directional adjacency. No movement rule reads them
+ * during play.
  */
 export class GridPosition implements Position {
+  readonly kind = 'grid2d';
+
   private constructor(
     private readonly row: number,
     private readonly column: number,
@@ -38,5 +43,27 @@ export class GridPosition implements Position {
       this.row === other.row &&
       this.column === other.column
     );
+  }
+
+  /** Exactly one grid step in a compass direction, or null otherwise (§6.1 assumption). */
+  directionTo(other: Position): Direction | null {
+    if (!(other instanceof GridPosition)) {
+      return null;
+    }
+    const deltaRow = other.row - this.row;
+    const deltaColumn = other.column - this.column;
+    if (deltaRow === -1 && deltaColumn === 0) {
+      return GridDirection.Up;
+    }
+    if (deltaRow === 1 && deltaColumn === 0) {
+      return GridDirection.Down;
+    }
+    if (deltaRow === 0 && deltaColumn === 1) {
+      return GridDirection.Right;
+    }
+    if (deltaRow === 0 && deltaColumn === -1) {
+      return GridDirection.Left;
+    }
+    return null;
   }
 }

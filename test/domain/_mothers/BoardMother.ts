@@ -12,7 +12,9 @@ import { Edge } from '@domain/shared/board/Edge';
 import { ChainId } from '@domain/shared/value-objects/ChainId';
 import { Direction } from '@domain/shared/value-objects/Direction';
 import { GridDirection } from '@domain/shared/value-objects/GridDirection';
+import { GridDirection3D } from '@domain/shared/value-objects/GridDirection3D';
 import { GridPosition } from '@domain/shared/value-objects/GridPosition';
+import { GridPosition3D } from '@domain/shared/value-objects/GridPosition3D';
 import { NodeId } from '@domain/shared/value-objects/NodeId';
 
 /**
@@ -32,6 +34,16 @@ export class BoardMother {
     cell: CellType,
   ): CellNode {
     return new CellNode(NodeId.of(id), GridPosition.of(row, column), cell);
+  }
+
+  private static node3d(
+    id: string,
+    row: number,
+    column: number,
+    layer: number,
+    cell: CellType,
+  ): CellNode {
+    return new CellNode(NodeId.of(id), GridPosition3D.of(row, column, layer), cell);
   }
 
   private static edge(from: string, to: string): Edge {
@@ -233,6 +245,85 @@ export class BoardMother {
       ],
       edges: [BoardMother.edge('n0', 'n1'), BoardMother.edge('n1', 'exit')],
       chains: [BoardMother.chainDef('c1', 'n0', 'n1')],
+    });
+  }
+
+  // --- 3D topologies (GridPosition3D / GridDirection3D) ----------------------
+
+  /** Two-node train [n0, n1] on a single layer whose head sits next to an exit
+   * (column +1 -> forward per the 3D axis mapping) and slides out. */
+  static threeDeeStraightPathToExitDefinition(): BoardDefinition {
+    return BoardDefinition.of({
+      nodes: [
+        BoardMother.node3d('n0', 0, 0, 0, new EmptyCell()),
+        BoardMother.node3d('n1', 0, 1, 0, BoardMother.arrow(GridDirection3D.Forward)),
+        BoardMother.node3d('exit', 0, 2, 0, new ExitCell()),
+      ],
+      edges: [BoardMother.edge('n0', 'n1'), BoardMother.edge('n1', 'exit')],
+      chains: [BoardMother.chainDef('c1', 'n0', 'n1')],
+    });
+  }
+
+  static threeDeeStraightPathToExit(): Board {
+    return BoardMother.build(BoardMother.threeDeeStraightPathToExitDefinition());
+  }
+
+  /** Single-node chain (no body, so no neck to skip while rotating) — isolated
+   * from the required exit, used to observe the raw 6-heading rotation cycle. */
+  static threeDeeLoneArrowDefinition(): BoardDefinition {
+    return BoardDefinition.of({
+      nodes: [
+        BoardMother.node3d('n0', 0, 0, 0, BoardMother.arrow(GridDirection3D.Forward)),
+        BoardMother.node3d('exit', 5, 5, 5, new ExitCell()),
+      ],
+      edges: [],
+      chains: [BoardMother.chainDef('c1', 'n0')],
+    });
+  }
+
+  static threeDeeLoneArrow(): Board {
+    return BoardMother.build(BoardMother.threeDeeLoneArrowDefinition());
+  }
+
+  /** A single chain walled in on all six 3D headings: no legal move -> deadlock. */
+  static threeDeeBoxedInDeadlockDefinition(): BoardDefinition {
+    return BoardDefinition.of({
+      nodes: [
+        BoardMother.node3d('n0', 1, 1, 1, BoardMother.arrow(GridDirection3D.Forward)),
+        BoardMother.node3d('layerUp', 1, 1, 0, new WallCell()),
+        BoardMother.node3d('layerDown', 1, 1, 2, new WallCell()),
+        BoardMother.node3d('rowLeft', 0, 1, 1, new WallCell()),
+        BoardMother.node3d('rowRight', 2, 1, 1, new WallCell()),
+        BoardMother.node3d('columnBackward', 1, 0, 1, new WallCell()),
+        BoardMother.node3d('columnForward', 1, 2, 1, new WallCell()),
+        BoardMother.node3d('exit', 3, 3, 3, new ExitCell()),
+      ],
+      edges: [
+        BoardMother.edge('n0', 'layerUp'),
+        BoardMother.edge('n0', 'layerDown'),
+        BoardMother.edge('n0', 'rowLeft'),
+        BoardMother.edge('n0', 'rowRight'),
+        BoardMother.edge('n0', 'columnBackward'),
+        BoardMother.edge('n0', 'columnForward'),
+      ],
+      chains: [BoardMother.chainDef('c1', 'n0')],
+    });
+  }
+
+  static threeDeeBoxedInDeadlock(): Board {
+    return BoardMother.build(BoardMother.threeDeeBoxedInDeadlockDefinition());
+  }
+
+  /** An edge whose 3D endpoints are two steps apart along the column axis. */
+  static threeDeeEdgeConnectsNonAdjacentNodesDefinition(): BoardDefinition {
+    return BoardDefinition.of({
+      nodes: [
+        BoardMother.node3d('n0', 0, 0, 0, BoardMother.arrow(GridDirection3D.Forward)),
+        BoardMother.node3d('far', 0, 2, 0, new EmptyCell()),
+        BoardMother.node3d('exit', 1, 0, 0, new ExitCell()),
+      ],
+      edges: [BoardMother.edge('n0', 'far')],
+      chains: [BoardMother.chainDef('c1', 'n0')],
     });
   }
 }

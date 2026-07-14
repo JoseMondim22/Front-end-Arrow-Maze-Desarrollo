@@ -32,4 +32,22 @@ describe('BoardBuilder', () => {
       new BoardBuilder(BoardMother.edgeConnectsNonAdjacentNodesDefinition()).build(),
     ).toThrow(DomainError);
   });
+
+  it('should_build_a_valid_3d_board_when_definition_is_well_formed', () => {
+    const board = new BoardBuilder(
+      BoardMother.threeDeeStraightPathToExitDefinition(),
+    ).build();
+
+    expect(board.chains).toHaveLength(1);
+    expect(board.chains[0].direction.id).toBe('forward');
+    expect(board.slideChain(ChainId.of('c1')).outcome).toBe('Exited');
+  });
+
+  it('should_fail_when_a_3d_edge_connects_non_adjacent_nodes', () => {
+    expect(() =>
+      new BoardBuilder(
+        BoardMother.threeDeeEdgeConnectsNonAdjacentNodesDefinition(),
+      ).build(),
+    ).toThrow(DomainError);
+  });
 });

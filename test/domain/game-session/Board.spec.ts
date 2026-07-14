@@ -142,4 +142,58 @@ describe('Board', () => {
 
     expect(afterExit.toView().chains).toHaveLength(0);
   });
+
+  it('should_move_entire_chain_when_path_is_clear_on_a_3d_board', () => {
+    const board = BoardMother.threeDeeStraightPathToExit();
+
+    const result = board.slideChain(ChainId.of('c1'));
+
+    expect(result.outcome).toBe('Exited');
+    expect(result.board.chains).toHaveLength(0);
+  });
+
+  it('should_report_no_legal_move_when_a_3d_chain_is_boxed_in_on_all_six_headings', () => {
+    const board = BoardMother.threeDeeBoxedInDeadlock();
+
+    expect(board.hasLegalMove(ChainId.of('c1'))).toBe(false);
+  });
+
+  it('should_cycle_through_all_six_headings_when_rotating_a_bodyless_3d_chain', () => {
+    // Single-node chain: no neck to skip, so this observes the raw 6-step cycle.
+    let board = BoardMother.threeDeeLoneArrow();
+    const headings: string[] = [board.chains[0].direction.id];
+
+    for (let step = 0; step < 6; step += 1) {
+      board = board.rotateChain(ChainId.of('c1'));
+      headings.push(board.chains[0].direction.id);
+    }
+
+    // 6-step cycle: back to the starting heading after exactly 6 rotations.
+    expect(headings).toEqual([
+      'forward',
+      'backward',
+      'up',
+      'right',
+      'down',
+      'left',
+      'forward',
+    ]);
+  });
+
+  it('should_skip_the_heading_that_faces_its_own_neck_when_rotating_a_3d_chain', () => {
+    // 2-node train: 'backward' from the head always points at the tail (the neck),
+    // so it must be skipped no matter where it falls in the 6-step cycle.
+    const board = BoardMother.threeDeeStraightPathToExit();
+
+    const rotated = board.rotateChain(ChainId.of('c1')); // forward -> (backward skipped) -> up
+    expect(rotated.chains[0].direction.id).toBe('up');
+  });
+
+  it('should_expose_the_third_axis_in_the_render_view_of_a_3d_board', () => {
+    const board = BoardMother.threeDeeStraightPathToExit();
+
+    const view = board.toView();
+
+    expect(view.boardKind).toBe('grid3d');
+  });
 });
