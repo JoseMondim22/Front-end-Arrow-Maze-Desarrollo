@@ -44,6 +44,20 @@ export class GridDirection implements Direction {
     return order[next];
   }
 
+  opposite(): Direction {
+    switch (this) {
+      case GridDirection.Up:
+        return GridDirection.Down;
+      case GridDirection.Down:
+        return GridDirection.Up;
+      case GridDirection.Right:
+        return GridDirection.Left;
+      default:
+        // GridDirection.Left is the only remaining case (4 flyweight instances total).
+        return GridDirection.Right;
+    }
+  }
+
   equals(other: Direction): boolean {
     return this.id === other.id;
   }

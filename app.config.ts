@@ -29,7 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     favicon: './assets/favicon.png',
   },
-  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-localization', 'expo-audio'],
+  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-localization', 'expo-audio', 'expo-asset'],
   extra: {
     apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:3000',
     eas: {

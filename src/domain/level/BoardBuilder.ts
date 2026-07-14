@@ -1,15 +1,18 @@
 import { ArrowChain } from '../game-session/ArrowChain';
-import { Board, DirectionalAdjacency } from '../game-session/Board';
+import { Board } from '../game-session/Board';
 import { CellNode } from '../shared/board/CellNode';
 import { ArrowCell } from '../shared/board/cells/ArrowCell';
 import { CellType } from '../shared/board/cells/CellType';
 import { EmptyCell } from '../shared/board/cells/EmptyCell';
 import { DomainError } from '../shared/errors/DomainError';
 import { Direction } from '../shared/value-objects/Direction';
-import { GridPosition } from '../shared/value-objects/GridPosition';
 import { NodeId } from '../shared/value-objects/NodeId';
 import { BoardDefinition } from './value-objects/BoardDefinition';
 import { ChainDefinition } from './value-objects/ChainDefinition';
+
+/** Adjacency being assembled for one node, keyed by Direction.id. Mutable while
+ * building; handed to Board (which only needs read access) once complete. */
+type MutableAdjacency = Map<string, NodeId | null>;
 
 /** A grid_arrow terrain always implements ArrowCell (it carries a direction). */
 function isArrowCell(cell: CellType): cell is ArrowCell {
@@ -23,11 +26,13 @@ function isArrowCell(cell: CellType): cell is ArrowCell {
  *
  * Assembles the Board in steps:
  *  1. index nodes by id,
- *  2. precompute directional adjacency ONCE from edges + grid positions (§6.1),
+ *  2. precompute directional adjacency ONCE from edges + node positions, via
+ *     Position.directionTo (§6.1) — geometry-agnostic, works for any Position kind,
  *  3. rebuild every ArrowChain from the explicit chain order (§6.3), validating it,
  *  4. project terrain (a grid_arrow seed becomes plain EmptyCell floor, §6.2).
  *
- * From here on the game never reads row/column again: movement runs on the adjacency.
+ * From here on the game never reads row/column/layer again: movement runs on the
+ * precomputed adjacency.
  */
 export class BoardBuilder {
   constructor(private readonly definition: BoardDefinition) {}
@@ -50,48 +55,29 @@ export class BoardBuilder {
 
   /**
    * Directional adjacency from undirected edges: each edge is read in BOTH ways
-   * (if `to` is up of `from`, then `from` is down of `to`). Endpoints must be exactly
-   * one grid step apart (§6.1 assumption) — anything else is a malformed board.
+   * (if `to` is up of `from`, then `from` is down of `to`, via Direction.opposite).
+   * Endpoints must be exactly one step apart in their own geometry (Position.directionTo
+   * returns null otherwise) — anything else is a malformed board. Geometry-agnostic:
+   * works for GridPosition (4 headings), GridPosition3D (6), or any future Position.
    */
-  private buildAdjacency(
-    nodes: Map<string, CellNode>,
-  ): Map<string, DirectionalAdjacency> {
-    const adjacency = new Map<string, DirectionalAdjacency>();
+  private buildAdjacency(nodes: Map<string, CellNode>): Map<string, MutableAdjacency> {
+    const adjacency = new Map<string, MutableAdjacency>();
     for (const node of this.definition.nodes) {
-      adjacency.set(node.id.toString(), {
-        up: null,
-        right: null,
-        down: null,
-        left: null,
-      });
+      adjacency.set(node.id.toString(), new Map<string, NodeId | null>());
     }
 
     for (const edge of this.definition.edges) {
-      const from = this.gridPositionOf(this.nodeOf(nodes, edge.from));
-      const to = this.gridPositionOf(this.nodeOf(nodes, edge.to));
-      const deltaRow = to.rowIndex - from.rowIndex;
-      const deltaColumn = to.columnIndex - from.columnIndex;
-
-      const fromAdj = this.adjacencyEntry(adjacency, edge.from);
-      const toAdj = this.adjacencyEntry(adjacency, edge.to);
-
-      if (deltaRow === -1 && deltaColumn === 0) {
-        fromAdj.up = edge.to;
-        toAdj.down = edge.from;
-      } else if (deltaRow === 1 && deltaColumn === 0) {
-        fromAdj.down = edge.to;
-        toAdj.up = edge.from;
-      } else if (deltaRow === 0 && deltaColumn === 1) {
-        fromAdj.right = edge.to;
-        toAdj.left = edge.from;
-      } else if (deltaRow === 0 && deltaColumn === -1) {
-        fromAdj.left = edge.to;
-        toAdj.right = edge.from;
-      } else {
+      const fromNode = this.nodeOf(nodes, edge.from);
+      const toNode = this.nodeOf(nodes, edge.to);
+      const direction = fromNode.at.directionTo(toNode.at);
+      if (direction === null) {
         throw new DomainError(
           `Edge ${edge.from.toString()} -> ${edge.to.toString()} connects non-adjacent nodes`,
         );
       }
+
+      this.adjacencyEntry(adjacency, edge.from).set(direction.id, edge.to);
+      this.adjacencyEntry(adjacency, edge.to).set(direction.opposite().id, edge.from);
     }
 
     return adjacency;
@@ -99,7 +85,7 @@ export class BoardBuilder {
 
   private buildChains(
     nodes: Map<string, CellNode>,
-    adjacency: Map<string, DirectionalAdjacency>,
+    adjacency: Map<string, MutableAdjacency>,
   ): ArrowChain[] {
     return this.definition.chains.map((chain) =>
       this.buildChain(chain, nodes, adjacency),
@@ -109,7 +95,7 @@ export class BoardBuilder {
   private buildChain(
     chain: ChainDefinition,
     nodes: Map<string, CellNode>,
-    adjacency: Map<string, DirectionalAdjacency>,
+    adjacency: Map<string, MutableAdjacency>,
   ): ArrowChain {
     const ids = chain.nodeIds;
 
@@ -161,29 +147,14 @@ export class BoardBuilder {
     );
   }
 
-  private areAdjacent(
-    a: NodeId,
-    b: NodeId,
-    adjacency: Map<string, DirectionalAdjacency>,
-  ): boolean {
+  private areAdjacent(a: NodeId, b: NodeId, adjacency: Map<string, MutableAdjacency>): boolean {
     const entry = adjacency.get(a.toString());
     if (entry === undefined) {
       return false;
     }
-    return [entry.up, entry.right, entry.down, entry.left].some(
+    return Array.from(entry.values()).some(
       (neighbour) => neighbour !== null && neighbour.equals(b),
     );
-  }
-
-  /** Adjacency is grid-derived, so every node needs a concrete GridPosition. */
-  private gridPositionOf(node: CellNode): GridPosition {
-    const position = node.at;
-    if (!(position instanceof GridPosition)) {
-      throw new DomainError(
-        `Node ${node.id.toString()} needs a GridPosition to derive adjacency`,
-      );
-    }
-    return position;
   }
 
   private nodeOf(nodes: Map<string, CellNode>, id: NodeId): CellNode {
@@ -195,9 +166,9 @@ export class BoardBuilder {
   }
 
   private adjacencyEntry(
-    adjacency: Map<string, DirectionalAdjacency>,
+    adjacency: Map<string, MutableAdjacency>,
     id: NodeId,
-  ): DirectionalAdjacency {
+  ): MutableAdjacency {
     const entry = adjacency.get(id.toString());
     if (entry === undefined) {
       throw new DomainError(`No adjacency slot for node: ${id.toString()}`);

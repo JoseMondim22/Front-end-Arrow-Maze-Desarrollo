@@ -3,22 +3,18 @@ import { CellType } from '../shared/board/cells/CellType';
 import { DomainError } from '../shared/errors/DomainError';
 import { ChainId } from '../shared/value-objects/ChainId';
 import { Direction } from '../shared/value-objects/Direction';
-import { GridPosition } from '../shared/value-objects/GridPosition';
 import { NodeId } from '../shared/value-objects/NodeId';
 import { Position } from '../shared/value-objects/Position';
 import { ArrowChain } from './ArrowChain';
 import { BoardView, CellView, ChainView } from './BoardView';
 
 /**
- * Directional neighbours of a node, precomputed once by BoardBuilder from the grid
- * positions. null means "no node in that direction" (edge of the graph).
+ * Directional neighbours of a node, precomputed once by BoardBuilder from the node
+ * positions. Keyed by Direction.id so this works for any geometry (2D's 4 headings,
+ * 3D's 6, or a future shape's N) without Board knowing how many directions exist.
+ * A missing/null entry means "no node in that direction" (edge of the graph).
  */
-export interface DirectionalAdjacency {
-  up: NodeId | null;
-  right: NodeId | null;
-  down: NodeId | null;
-  left: NodeId | null;
-}
+export type DirectionalAdjacency = ReadonlyMap<string, NodeId | null>;
 
 /** Result of attempting to slide a chain. See §6.4. 'Stopped' cannot happen under
  * the all-or-nothing rule: a chain either escapes or reverts wholesale. */
@@ -64,32 +60,29 @@ export class Board {
 
   /**
    * Read-only render snapshot (§6.5 GameSession.view). Positions are ONLY used here
-   * — this is the one place in the domain allowed to require a concrete GridPosition,
-   * because a BoardView exists purely to be painted, never to resolve a rule.
+   * — a BoardView exists purely to be painted, never to resolve a rule. Kept generic
+   * (Position, not a concrete grid type) so any geometry can be projected; the UI
+   * picks how to paint it via BoardView.boardKind.
    */
   toView(): BoardView {
     const cells = [...this.terrain.entries()].map(
-      ([id, terrain]) =>
-        new CellView(NodeId.of(id), this.gridPositionAt(id), terrain.id),
+      ([id, terrain]) => new CellView(NodeId.of(id), this.positionAt(id), terrain.id),
     );
     const chains = this.activeChains.map(
       (chain) =>
         new ChainView(
           chain.id,
-          chain.nodeIds.map((nodeId) => this.gridPositionAt(nodeId.toString())),
+          chain.nodeIds.map((nodeId) => this.positionAt(nodeId.toString())),
           chain.direction,
         ),
     );
     return new BoardView(cells, chains);
   }
 
-  private gridPositionAt(nodeKey: string): GridPosition {
+  private positionAt(nodeKey: string): Position {
     const position = this.positions.get(nodeKey);
     if (position === undefined) {
       throw new DomainError(`No position for node: ${nodeKey}`);
-    }
-    if (!(position instanceof GridPosition)) {
-      throw new DomainError(`Node ${nodeKey} needs a GridPosition to render`);
     }
     return position;
   }
@@ -151,10 +144,13 @@ export class Board {
   }
 
   /**
-   * Rotate one chain's head 90 clockwise, returning a new board. A chain with a
-   * body (length > 1) can never face its own neck — that orientation would point
-   * the arrow straight into itself, which is not a real move option — so that one
-   * direction out of the four is skipped, landing on the next clockwise heading.
+   * Rotate one chain's head 90 clockwise (or one step of whatever cycle its
+   * Direction implements), returning a new board. A chain with a body (length > 1)
+   * can never face its own neck — that orientation would point the arrow straight
+   * into itself, which is not a real move option — so that one heading is skipped,
+   * landing on the next heading in the cycle. Bounded by "back to the starting
+   * heading" rather than a fixed count, so this works for any Direction cycle
+   * length (4 for GridDirection, 6 for GridDirection3D, ...).
    */
   rotateChain(chainId: ChainId): Board {
     const chain = this.findChain(chainId);
@@ -162,13 +158,14 @@ export class Board {
 
     let rotated = chain.rotate();
     if (neck !== null) {
-      for (let attempt = 0; attempt < 4; attempt += 1) {
+      const start = rotated.direction;
+      do {
         const facing = this.neighbourOf(chain.head, rotated.direction);
         if (facing === null || !facing.equals(neck)) {
           break;
         }
         rotated = rotated.rotate();
-      }
+      } while (!rotated.direction.equals(start));
     }
 
     const updatedChains = this.activeChains.map((c) => (c.id.equals(chainId) ? rotated : c));
@@ -176,9 +173,9 @@ export class Board {
   }
 
   /**
-   * Can this chain move at all? A move is legal if the FIRST step in ANY of the four
-   * head directions is not blocked (rotating to that direction is free, so it counts
-   * as an escape route). Used for deadlock detection. See §7 decision 9.
+   * Can this chain move at all? A move is legal if the FIRST step in ANY head
+   * direction is not blocked (rotating to that direction is free, so it counts as
+   * an escape route). Used for deadlock detection. See §7 decision 9.
    */
   hasLegalMove(chainId: ChainId): boolean {
     const chain = this.findChain(chainId);
@@ -186,13 +183,7 @@ export class Board {
     if (adjacency === undefined) {
       return false;
     }
-    const neighbours: ReadonlyArray<NodeId | null> = [
-      adjacency.up,
-      adjacency.right,
-      adjacency.down,
-      adjacency.left,
-    ];
-    return neighbours.some((next) => this.isFirstStepLegal(next, chain));
+    return Array.from(adjacency.values()).some((next) => this.isFirstStepLegal(next, chain));
   }
 
   private isFirstStepLegal(next: NodeId | null, chain: ArrowChain): boolean {
@@ -224,18 +215,7 @@ export class Board {
     if (adjacency === undefined) {
       return null;
     }
-    switch (direction.id) {
-      case 'up':
-        return adjacency.up;
-      case 'right':
-        return adjacency.right;
-      case 'down':
-        return adjacency.down;
-      case 'left':
-        return adjacency.left;
-      default:
-        throw new DomainError(`Unknown direction: ${direction.id}`);
-    }
+    return adjacency.get(direction.id) ?? null;
   }
 
   private terrainAt(nodeId: NodeId): CellType {

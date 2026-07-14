@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { GridPosition } from '../../domain/shared/value-objects/GridPosition';
-import type { ChainView as ChainViewModel } from '../../domain/game-session/BoardView';
+import { useTapOrDoubleTap } from '../hooks/useTapOrDoubleTap';
 import { chainPalette, colors } from '../theme';
+import type { Grid2DChainView } from './grid2dTypes';
 
 interface Props {
-  chain: ChainViewModel;
+  chain: Grid2DChainView;
   cellSize: number;
   onMove: () => void;
   onRotate: () => void;
@@ -21,7 +22,6 @@ interface Props {
   onExitAnimationEnd?: () => void;
 }
 
-const DOUBLE_TAP_WINDOW_MS = 300;
 const SLIDE_DURATION_MS = 180;
 const ROTATE_DURATION_MS = 150;
 const EXIT_STEP_DURATION_MS = 130;
@@ -218,8 +218,6 @@ export function ChainView({
   exitTravelCells = 0,
   onExitAnimationEnd,
 }: Props): React.JSX.Element {
-  const lastTapAt = useRef(0);
-  const pendingMove = useRef<ReturnType<typeof setTimeout> | null>(null);
   const segmentAnimations = useSegmentAnimations(chain.segments, cellSize);
   const rotationDegrees = useHeadRotationAnimation(chain.headDirection.id);
   const chainColor = useRandomChainColor();
@@ -234,25 +232,7 @@ export function ChainView({
     onDone: onExitAnimationEnd,
   });
 
-  const handlePress = (): void => {
-    if (isExiting) {
-      return;
-    }
-    const now = Date.now();
-    if (now - lastTapAt.current < DOUBLE_TAP_WINDOW_MS) {
-      if (pendingMove.current !== null) {
-        clearTimeout(pendingMove.current);
-        pendingMove.current = null;
-      }
-      lastTapAt.current = 0;
-      onRotate();
-      return;
-    }
-    lastTapAt.current = now;
-    pendingMove.current = setTimeout(() => {
-      onMove();
-    }, DOUBLE_TAP_WINDOW_MS);
-  };
+  const handlePress = useTapOrDoubleTap(onMove, onRotate, isExiting);
 
   return (
     <>

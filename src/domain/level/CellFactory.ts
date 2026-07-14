@@ -4,17 +4,20 @@ import { ExitCell } from '../shared/board/cells/ExitCell';
 import { GridArrowCell } from '../shared/board/cells/GridArrowCell';
 import { WallCell } from '../shared/board/cells/WallCell';
 import { DomainError } from '../shared/errors/DomainError';
-import { GridDirection } from '../shared/value-objects/GridDirection';
+import { DirectionFactory } from './DirectionFactory';
 
 /**
  * Domain-local input shape for CellFactory. Deliberately NOT the adapters' DTO
  * (NodeRawData): the domain must not import anything from Capa 3 (§8). LevelMapper
  * translates its raw board data into this shape before calling the factory, so the
  * domain never sees an external DTO directly — same resolution the backend uses.
+ * positionType is forwarded to DirectionFactory: a grid_arrow's direction vocabulary
+ * depends on the node's geometry (2D compass vs 3D compass).
  */
 export interface CellRawData {
   type: 'grid_arrow' | 'wall' | 'empty' | 'exit';
   direction?: string;
+  positionType?: string;
 }
 
 /**
@@ -26,7 +29,9 @@ export class CellFactory {
   static create(data: CellRawData): CellType {
     switch (data.type) {
       case 'grid_arrow':
-        return new GridArrowCell(GridDirection.of(CellFactory.requireDirection(data)));
+        return new GridArrowCell(
+          DirectionFactory.create(CellFactory.requireDirection(data), data.positionType),
+        );
       case 'wall':
         return new WallCell();
       case 'empty':

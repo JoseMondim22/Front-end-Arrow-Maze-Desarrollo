@@ -1,10 +1,10 @@
 import { StyleSheet, View } from 'react-native';
 import { CellTypeId } from '../../domain/shared/board/cells/CellType';
-import type { CellView as CellViewModel } from '../../domain/game-session/BoardView';
 import { colors } from '../theme';
+import type { Grid2DCellView } from './grid2dTypes';
 
 interface Props {
-  cell: CellViewModel;
+  cell: Grid2DCellView;
   cellSize: number;
 }
 

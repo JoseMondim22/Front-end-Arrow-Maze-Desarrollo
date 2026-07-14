@@ -1,18 +1,19 @@
 import { CellTypeId } from '../shared/board/cells/CellType';
 import { ChainId } from '../shared/value-objects/ChainId';
 import { Direction } from '../shared/value-objects/Direction';
-import { GridPosition } from '../shared/value-objects/GridPosition';
 import { NodeId } from '../shared/value-objects/NodeId';
+import { Position } from '../shared/value-objects/Position';
 
 /**
  * Read-only render leaf: one terrain node, where to paint it (§6.1) and what kind
  * of ground it is. A grid_arrow seed never reaches here — BoardBuilder already
  * projects it to plain empty floor (§6.2), so terrain is always wall/empty/exit.
+ * position is generic (any geometry) — the UI narrows it via BoardView.boardKind.
  */
 export class CellView {
   constructor(
     readonly nodeId: NodeId,
-    readonly position: GridPosition,
+    readonly position: Position,
     readonly terrain: CellTypeId,
   ) {}
 }
@@ -24,11 +25,11 @@ export class CellView {
 export class ChainView {
   constructor(
     readonly chainId: ChainId,
-    readonly segments: readonly GridPosition[],
+    readonly segments: readonly Position[],
     readonly headDirection: Direction,
   ) {}
 
-  get headPosition(): GridPosition {
+  get headPosition(): Position {
     return this.segments[this.segments.length - 1];
   }
 }
@@ -46,4 +47,11 @@ export class BoardView {
     readonly cells: readonly CellView[],
     readonly chains: readonly ChainView[],
   ) {}
+
+  /** Self-describing discriminator (e.g. 'grid2d', 'grid3d') so the UI can pick a
+   * renderer. Derived from any cell's position — every node in a board shares the
+   * same geometry. Defaults to 'grid2d' for an (impossible in practice) empty board. */
+  get boardKind(): string {
+    return this.cells[0]?.position.kind ?? 'grid2d';
+  }
 }
